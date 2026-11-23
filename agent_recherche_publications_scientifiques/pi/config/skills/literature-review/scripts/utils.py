@@ -75,8 +75,20 @@ def normalize_title(title: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text)
 
 
-def make_record(source: str, doc_id: str, title: str, authors: list, year, abstract: str, pdf_url: str, doi: str = "") -> dict:
-    first_full = next(iter(authors), "") if authors else ""
+def first(value):
+    """Premier élément si la valeur est une liste (les API Solr renvoient souvent des listes)."""
+    if isinstance(value, list):
+        return value[0] if value else ""
+    return value if value is not None else ""
+
+
+def make_record(source: str, doc_id: str, title: str, authors: list, year, abstract: str, pdf_url: str, doi: str = "",
+                *, item_type: str = "GEN", container: str = "", volume="", issue="", pages: str = "",
+                language: str = "", url: str = "", cited_by=None, citation_percentile=None) -> dict:
+    """Notice normalisée. `item_type` est un code de type RIS (JOUR, THES, CHAP, BOOK, CONF, RPRT, GEN),
+    réutilisé tel quel par l'export Zotero."""
+    authors = [a for a in (authors or []) if a]
+    first_full = authors[0] if authors else ""
     first_author = first_full.split()[-1] if first_full.strip() else "Unknown"
     year_str = str(year) if year else "0000"
     safe_title = sanitize_filename(title, 45)
@@ -84,12 +96,21 @@ def make_record(source: str, doc_id: str, title: str, authors: list, year, abstr
     return {
         "id": f"{source}:{doc_id}",
         "source": source,
+        "type": item_type or "GEN",
         "title": (title or "").replace("\n", " ").strip(),
-        "authors": list(authors)[:5],
+        "authors": authors,  # liste complète : Zotero en a besoin
         "year": year_str,
+        "container": (first(container) or "").strip(),
+        "volume": str(first(volume) or ""),
+        "issue": str(first(issue) or ""),
+        "pages": str(first(pages) or ""),
+        "language": str(first(language) or ""),
         "doi": normalize_doi(doi),
-        "abstract": (abstract or "")[:700].replace("\n", " ").strip(),
+        "url": url or "",
+        "abstract": (abstract or "").replace("\n", " ").strip(),  # complet ; tronqué seulement pour le LLM
         "pdf_url": pdf_url or "",
+        "cited_by": cited_by,  # None = inconnu (≠ 0)
+        "citation_percentile": citation_percentile,
         "suggested_filename": filename,
     }
 

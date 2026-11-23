@@ -1,5 +1,10 @@
 import re
-from utils import HTTP_SESSION, build_url, make_record
+from utils import HTTP_SESSION, build_url, make_record, first
+
+TYPES = {
+    "journal-article": "JOUR", "book-chapter": "CHAP", "proceedings-article": "CONF",
+    "book": "BOOK", "monograph": "BOOK", "dissertation": "THES", "report": "RPRT",
+}
 
 
 def search(query: str, max_results: int, lang: str = None) -> list:
@@ -10,9 +15,6 @@ def search(query: str, max_results: int, lang: str = None) -> list:
 
     results = []
     for item in r.json().get("message", {}).get("items", []):
-        raw_title = item.get("title", [])
-        title = next(iter(raw_title), "") if isinstance(raw_title, list) else str(raw_title)
-
         authors = [
             f"{a.get('given', '')} {a.get('family', '')}".strip()
             for a in item.get("author", [])
@@ -31,12 +33,19 @@ def search(query: str, max_results: int, lang: str = None) -> list:
         results.append(make_record(
             source="crossref",
             doc_id=item.get("DOI", ""),
-            title=title,
+            title=first(item.get("title", "")),
             authors=authors,
             year=year,
             abstract=abstract,
             pdf_url=pdf_url,
             doi=item.get("DOI", ""),
+            item_type=TYPES.get(item.get("type"), "GEN"),
+            container=first(item.get("container-title", "")),
+            volume=item.get("volume"),
+            issue=item.get("issue"),
+            pages=item.get("page"),
+            language=item.get("language"),
+            url=item.get("URL", ""),
+            cited_by=item.get("is-referenced-by-count"),
         ))
     return results
-

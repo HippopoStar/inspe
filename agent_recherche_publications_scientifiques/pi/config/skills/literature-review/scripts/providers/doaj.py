@@ -12,9 +12,12 @@ def search(query: str, max_results: int, lang: str = None) -> list:
     results = []
     for item in r.json().get("results", []):
         bib = item.get("bibjson", {})
+        journal = bib.get("journal", {})
         authors = [a.get("name", "") for a in bib.get("author", [])]
-        pdf_url = next((l.get("url") for l in bib.get("link", []) if l.get("type") == "fulltext"), "")
+        # Le lien « fulltext » de DOAJ est souvent une page HTML ; download vérifie la signature %PDF
+        fulltext = next((l.get("url") for l in bib.get("link", []) if l.get("type") == "fulltext"), "")
         doi = next((i.get("id") for i in bib.get("identifier", []) if i.get("type") == "doi"), "")
+        pages = "-".join(p for p in (bib.get("start_page"), bib.get("end_page")) if p)
         results.append(make_record(
             source="doaj",
             doc_id=item.get("id", ""),
@@ -22,8 +25,14 @@ def search(query: str, max_results: int, lang: str = None) -> list:
             authors=authors,
             year=bib.get("year"),
             abstract=bib.get("abstract", ""),
-            pdf_url=pdf_url,
+            pdf_url=fulltext,
             doi=doi,
+            item_type="JOUR",
+            container=journal.get("title", ""),
+            volume=journal.get("volume"),
+            issue=journal.get("number"),
+            pages=pages,
+            language=journal.get("language"),
+            url=fulltext,
         ))
     return results
-
