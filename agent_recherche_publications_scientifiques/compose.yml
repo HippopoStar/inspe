@@ -1,0 +1,103 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    expose:
+      - "11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      # Optimisations strictes pour 4 Go de VRAM (RTX 3050)
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_KEEP_ALIVE=5m
+      - OLLAMA_FLASH_ATTENTION=1
+      # Force une fenêtre de contexte de 8k tokens et compresse le cache KV pour tenir dans 4 Go de VRAM
+      - OLLAMA_CONTEXT_LENGTH=16384
+      - OLLAMA_KV_CACHE_TYPE=q4_0
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - ai-net
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:8080"
+    volumes:
+      - open_webui_data:/app/backend/data
+      - ./workspace:/app/backend/data/workspace_shared:ro
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      # Force l'embedding RAG sur CPU pour préserver les 4 Go de VRAM pour le LLM
+      - RAG_EMBEDDING_ENGINE=
+      - USE_CUDA_DOCKER=false
+      - ENABLE_OLLAMA_API=true
+      - ENABLE_OPENAI_API=false
+      - WEBUI_AUTH=false
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      ollama:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - ai-net
+
+  pi:
+    build:
+      context: ./pi
+      dockerfile: Dockerfile
+    image: local-pi-agent:latest
+    user: "1000:1000"
+    profiles: ["cli"]
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    volumes:
+      - ./workspace:/workspace
+      # Protège les instructions et scripts contre toute modification accidentelle par le LLM
+      - ./pi/config/AGENTS.md:/home/node/.pi/agent/AGENTS.md:ro
+      - ./pi/config/models.json:/home/node/.pi/agent/models.json:ro
+      - ./pi/config/skills:/home/node/.pi/agent/skills:ro
+      - ./pi/config/sessions:/home/node/.pi/agent/sessions
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434/v1
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - ai-net
+
+volumes:
+  ollama_data:
+  open_webui_data:
+
+networks:
+  ai-net:
+    driver: bridge
+
