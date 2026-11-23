@@ -35,9 +35,9 @@ def cmd_review(a):
     records = rank.rank(search.search(queries, a.sources, a.max_results), a.topic or " / ".join(queries),
                         rank.ollama_scorer(a.model))
     save(a.dir, records)
-    keep = rank.selected(records, a.min_relevance)
+    keep = rank.selected(records, a.min_relevance, a.top)
     pdf.download(keep, a.dir)
-    print(f"\n{len(keep)}/{len(records)} publication(s) retenue(s) (pertinence ≥ {a.min_relevance}). "
+    print(f"\n{len(keep)}/{len(records)} publication(s) retenue(s) (pertinence ≥ {a.min_relevance}, {a.top} au plus). "
           f"Zotero : importer {os.path.join(a.dir, 'selection.ris')}\n")
     print(export.write(keep, a.dir))
 
@@ -52,11 +52,11 @@ def cmd_rank(a):
 
 def cmd_download(a):
     records = load(a.dir)
-    pdf.download([r for r in records if r["id"] in a.ids] if a.ids else rank.selected(records, a.min_relevance), a.dir)
+    pdf.download([r for r in records if r["id"] in a.ids] if a.ids else rank.selected(records, a.min_relevance, a.top), a.dir)
 
 
 def cmd_export(a):
-    print(export.write(rank.selected(load(a.dir), a.min_relevance), a.dir))
+    print(export.write(rank.selected(load(a.dir), a.min_relevance, a.top), a.dir))
 
 
 def cmd_sources(a):
@@ -103,6 +103,7 @@ def build_parser():
 
     def selection_option(p):
         p.add_argument("--min-relevance", type=int, default=2, help="note minimale (0-3) pour être retenu")
+        p.add_argument("--top", type=int, default=20, help="nombre maximal de publications retenues (les mieux classées)")
 
     p = command("review", cmd_review, "search + rank + download + export")
     p.add_argument("--fr", nargs="+", required=True, help="requêtes en français")

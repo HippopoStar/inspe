@@ -58,9 +58,12 @@ def rank(records: list, topic: str, scorer) -> list:
         except Exception as e:
             rec["relevance"] = None
             print(f"[rank] {rec['id']} : échec ({e})")
-        print(f"[rank] {i}/{len(records)} {rec['relevance']} {rec['title'][:70]}")
+        if i % 25 == 0 or i == len(records):  # peu de lignes : toute la sortie revient dans le contexte de l'agent
+            print(f"[rank] {i}/{len(records)} notées")
+    print("[rank] notes : " + ", ".join(f"{k} = {sum(r['relevance'] == k for r in records)}" for k in (3, 2, 1, 0)))
     return sorted(records, key=sort_key, reverse=True)
 
 
-def selected(records: list, min_relevance: int) -> list:
-    return [r for r in records if (r.get("relevance") or 0) >= min_relevance]
+def selected(records: list, min_relevance: int, top: int = None) -> list:
+    """Les `top` meilleures notices (déjà classées) de pertinence ≥ min_relevance."""
+    return [r for r in records if (r.get("relevance") or 0) >= min_relevance][:top]

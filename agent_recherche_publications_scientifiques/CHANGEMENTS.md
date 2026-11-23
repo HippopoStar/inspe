@@ -35,6 +35,7 @@
 **Classement**
 - Ordre : pertinence 0-3, puis percentile de citations OpenAlex (corrigé de l'âge et du domaine), puis citations brutes.
 - Les citations viennent toutes d'OpenAlex : des chiffres de bases différentes ne sont pas comparables.
+- Seules les 20 mieux classées sont retenues (`--top`), et la commande n'affiche qu'un résumé. Toute sa sortie revient dans le contexte 8k de l'agent : au premier essai, 223 lignes l'avaient fait dérailler.
 
 **Zotero**
 - Chaque notice a son type, sa revue, son volume, son numéro, ses pages, sa langue, tous ses auteurs et son résumé complet.
