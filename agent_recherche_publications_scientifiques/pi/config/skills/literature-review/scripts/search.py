@@ -39,7 +39,8 @@ def search(queries: list, sources: list, max_results: int, lang: str = None, cor
     for source in usable_sources(sources):
         for query in queries:
             try:
-                found = SOURCES[source]["fn"](query, max_results, lang)
+                extra = {"core": core} if SOURCES[source]["takes_core"] and core else {}
+                found = SOURCES[source]["fn"](query, max_results, lang, **extra)
                 print(f"[{source}] « {query} » : {len(found)}")
                 raw += found
             except Exception as e:

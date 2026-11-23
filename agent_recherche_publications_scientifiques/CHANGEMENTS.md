@@ -41,7 +41,9 @@
 - Les citations viennent toutes d'OpenAlex : des chiffres de bases différentes ne sont pas comparables.
 - Les bases sans DOI ne sont pas défavorisées : ERIC n'avait ni citations ni percentile (58 notices sur 59 au 3e essai), donc aucun bonus, et passait sous toute notice mesurée. Après la notation, les notices pertinentes sans DOI sont retrouvées dans OpenAlex par leur titre exact (année ±1) : 31 sur 35 au 3e essai, avec citations et DOI. Un percentile encore inconnu vaut 0,5 (valeur attendue d'une répartition uniforme) et non 0, tandis qu'un 0 mesuré reste un 0. Rejoué sur le 3e essai, le top 20 ne change pas : les notices ERIC retrouvées ont de vrais percentiles (0,92 ; 0,89) plus bas que les 20 premières (≥ 0,95), et se classent 22e, 23e…
 - Une notice sans résumé est notée 2 au plus : sur le titre seul, le modèle donnait 3 à des textes hors sujet.
-- Le correcteur reçoit le concept central (`--core`) en plus du sujet : au 4e essai, l'agent avait écrit le sujet « peer learning *vs traditional teaching* », et 3 articles sur l'enseignement traditionnel ou l'apprentissage par problèmes, sans rapport avec l'apprentissage entre pairs, avaient reçu 3 (places 2, 9 et 14 du top 20). Non vérifié sans Ollama : le prochain essai dira si cela suffit.
+- Le correcteur reçoit le concept central (`--core`) en plus du sujet : au 4e essai, l'agent avait écrit le sujet « peer learning *vs traditional teaching* », et 3 articles sur l'enseignement traditionnel ou l'apprentissage par problèmes, sans rapport avec l'apprentissage entre pairs, avaient reçu 3 (places 2, 9 et 14 du top 20). Non vérifié sans Ollama : le prochain essai dira si cela suffit. Au 5e essai, ces 3 articles passent à 2.
+- `--core` contient chaque concept nommé par l'utilisateur (8 termes au plus), et l'exemple de `SKILL.md` porte sur un autre sujet. Aux 4e et 5e essais, le modèle avait recopié le `--core` de l'exemple, qui portait justement sur le peer learning, et oublié la peer instruction et l'évaluation par les pairs demandées : Crouch & Mazur 2001 (3 493 citations) et Hake 1998 (11 228), en tête du 3e essai, avaient disparu.
+- HAL, TEL et DUMAS exigent tous les mots d'une requête : au 5e essai, ils n'avaient renvoyé que 7 notices pour 12 requêtes, d'où presque aucune publication française. Ils exigent désormais l'un des concepts de `--core` (expression exacte) et les mots de la requête ne font que classer les résultats. Rejoué sur les requêtes du 5e essai : 37 notices uniques sur le sujet, dont 32 en français.
 - Seules les 20 mieux classées sont retenues (`--top`), et la commande n'affiche qu'un résumé. Toute sa sortie revient dans le contexte 8k de l'agent : au premier essai, 223 lignes l'avaient fait dérailler.
 
 **Zotero**
@@ -70,6 +72,7 @@
 **Corrections**
 - Bouton Annuler de `start-pi.sh`.
 - Seuls de vrais liens PDF sont gardés.
+- Une même œuvre sous deux titres sans DOI commun (« X : sous-titre » et « X ») est fusionnée quand le titre principal, l'année et le premier auteur concordent : le livre de Boud apparaissait deux fois.
 - ERIC termine une liste d'auteurs tronquée par « And Others » : ce n'est plus importé comme un auteur (`AU - Others, And` dans le `.ris`).
 - Dépendances Python inutilisées retirées.
 

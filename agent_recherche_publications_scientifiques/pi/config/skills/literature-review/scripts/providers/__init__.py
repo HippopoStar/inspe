@@ -6,8 +6,9 @@ from net import secret
 from . import hal, openalex, semanticscholar, crossref, eric, doaj, core, springer, scopus, wos
 
 
-def _base(label, fn, key=None, required=False, note=""):
-    return {"label": label, "fn": fn, "key": key, "required": required, "note": note}
+def _base(label, fn, key=None, required=False, note="", takes_core=False):
+    """takes_core : la fonction accepte `core=` (concepts centraux), pour les bases qui exigent tous les mots."""
+    return {"label": label, "fn": fn, "key": key, "required": required, "note": note, "takes_core": takes_core}
 
 
 def _publisher(label, doi_prefix, name):
@@ -17,9 +18,9 @@ def _publisher(label, doi_prefix, name):
 
 SOURCES = {
     "openalex": _base("OpenAlex", openalex.search, "openalex_api_key", note="sans clé : quota très réduit"),
-    "hal": _base("HAL", hal.search),
-    "tel": _base("TEL (thèses)", partial(hal.search, portal="tel", source="tel")),
-    "dumas": _base("DUMAS (mémoires)", partial(hal.search, portal="dumas", source="dumas")),
+    "hal": _base("HAL", hal.search, takes_core=True),
+    "tel": _base("TEL (thèses)", partial(hal.search, portal="tel", source="tel"), takes_core=True),
+    "dumas": _base("DUMAS (mémoires)", partial(hal.search, portal="dumas", source="dumas"), takes_core=True),
     "crossref": _base("Crossref", crossref.search),
     "cairn": _publisher("Cairn", "10.3917", "cairn"),
     "persee": _publisher("Persée", "10.3406", "persee"),

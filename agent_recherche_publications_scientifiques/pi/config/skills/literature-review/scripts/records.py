@@ -60,10 +60,23 @@ def fill_gaps(target: dict, other: dict):
             target[key] = value
 
 
+def _work_key(rec: dict) -> str:
+    """Même œuvre sous deux titres (« X : sous-titre » et « X ») sans DOI commun : titre avant les deux-points, année et
+    nom du premier auteur. Au 5e essai, le livre de Boud apparaissait deux fois. Au moins 3 mots, pour ne pas confondre
+    deux chapitres « Introduction : … » d'un même auteur."""
+    main = rec["title"].split(":")[0]
+    if len(main.split()) < 3 or not rec["authors"] or rec["year"] == "0000":
+        return ""
+    author = rec["authors"][0]
+    surname = author.split(",")[0] if "," in author else author.split()[-1]   # « Boud, David » ou « David Boud »
+    return f"work:{normalize_title(main)}:{rec['year']}:{normalize_title(surname)}"
+
+
 def match_keys(rec: dict) -> list:
     """Clés d'identité d'une notice : deux notices partageant une clé sont le même document."""
     return [k for k in (f"doi:{rec['doi']}" if rec["doi"] else "",
-                        f"title:{normalize_title(rec['title'])}" if rec["title"] else "") if k]
+                        f"title:{normalize_title(rec['title'])}" if rec["title"] else "",
+                        _work_key(rec) if rec["title"] else "") if k]
 
 
 def deduplicate(records: list) -> list:

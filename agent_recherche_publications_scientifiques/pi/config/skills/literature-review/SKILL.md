@@ -12,20 +12,21 @@ description: Builds a selection of scientific publications on a topic (HAL, TEL,
 ## 1. Prepare the command (no long thinking)
 
 - `--topic`: the user's subject in one sentence, with its context (level, method).
-- `--core`: the core concept and its synonyms, in English and French, 1 to 3 words each, nothing else (no "comparative", "study"). The most cited works with these words in their title are added: the classics.
-- `--fr` and `--en`: 2 or 3 keyword queries in each language, not the user's sentence. **Every query contains the core concept and has 2 to 4 words**: HAL, TEL and DUMAS require every word, so a long query finds nothing.
+- `--core`: **every concept the user names**, each in English and in French, 1 to 3 words each, at most 8 terms, nothing else (no "comparative", "study"). A publication must study one of them to get the top grade, and their most cited works are added: the classics.
+- `--fr` and `--en`: 2 to 4 keyword queries in each language, not the user's sentence: **at least one per concept, 2 to 4 words each, with the concept in it**.
 - `--sources`: names separated by spaces, without quotes. Education: `hal tel dumas eric cairn openalex`. Humanities, French-speaking: `hal tel dumas cairn persee openedition openalex`. Sciences: `openalex semanticscholar core springer scopus wos`. Unsure: `all` (slower). A database whose key is missing is skipped.
 
-Example for "études comparatives sur le peer learning":
-`--topic "Comparative studies of peer learning" --core "peer learning" "peer tutoring" "apprentissage entre pairs"`
-`--fr "apprentissage entre pairs" "tutorat entre pairs efficacité" --en "peer learning comparative study" "peer tutoring effectiveness"`
+Example for "classe inversée et apprentissage par problèmes à l'université : effets sur la réussite" (2 concepts):
+`--topic "Effects of the flipped classroom and problem-based learning on achievement in higher education"`
+`--core "flipped classroom" "classe inversée" "problem-based learning" "apprentissage par problèmes"`
+`--fr "classe inversée réussite" "apprentissage par problèmes université" --en "flipped classroom achievement" "problem-based learning effectiveness"`
 
 ## 2. Run it
 
 ```bash
 python3 /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py review \
   --topic "<subject in one sentence>" \
-  --core "<concept>" "<synonym>" "<concept FR>" \
+  --core "<concept 1>" "<concept 1 FR>" "<concept 2>" "<concept 2 FR>" \
   --fr "<requête 1>" "<requête 2>" \
   --en "<query 1>" "<query 2>" \
   --sources <sources>

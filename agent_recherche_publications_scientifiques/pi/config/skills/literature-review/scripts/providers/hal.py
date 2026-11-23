@@ -10,10 +10,17 @@ FIELDS = ("halId_s,title_s,authFullName_s,producedDateY_i,abstract_s,fileMain_s,
           "journalTitle_s,bookTitle_s,conferenceTitle_s,volume_s,issue_s,page_s,language_s,uri_s")
 
 
-def search(query: str, max_results: int, lang: str = None, portal: str = "", source: str = "hal") -> list:
-    q = f"({lucene_safe(query)})" + (f" AND language_s:{lang}" if lang else "")
-    r = HTTP.get(URL + (f"{portal}/" if portal else ""), timeout=20,
-                 params={"q": q, "rows": max_results, "wt": "json", "fl": FIELDS})
+def search(query: str, max_results: int, lang: str = None, portal: str = "", source: str = "hal",
+           core: list = ()) -> list:
+    params = {"q": f"({lucene_safe(query)})", "rows": max_results, "wt": "json", "fl": FIELDS}
+    if core:
+        # HAL exige tous les mots : au 5e essai, « peer learning comparative study traditional teaching » n'y trouvait
+        # rien. Avec les concepts centraux, l'un d'eux (expression exacte) est exigé ; les mots de la requête classent.
+        params["q"] = "+(" + " OR ".join(f'"{lucene_safe(t)}"' for t in core) + f") {lucene_safe(query)}"
+        params["q.op"] = "OR"
+    if lang:
+        params["fq"] = f"language_s:{lang}"
+    r = HTTP.get(URL + (f"{portal}/" if portal else ""), timeout=20, params=params)
     r.raise_for_status()
     return [make_record(
         source, d.get("halId_s", ""), d.get("title_s"), d.get("authFullName_s"), d.get("producedDateY_i"),

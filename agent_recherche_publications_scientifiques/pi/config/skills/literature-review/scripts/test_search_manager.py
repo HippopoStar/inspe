@@ -35,6 +35,19 @@ def test_dedup_merges_doi_and_title():
     assert out[0]["cited_by"] == 12 and out[0]["doi"] == "10.1/x"
 
 
+def test_dedup_same_work_under_two_titles():
+    book = lambda title, author, year, **kw: make_record("openalex", title, title, [author], year, **kw)
+    out = deduplicate([book("Peer Learning in Higher Education : Learning from and with Each Other", "David J. Boud", 2014,
+                            cited_by=887),
+                       book("Peer Learning in Higher Education", "Boud, David", 2014, doi="10.4324/9781315042565")])
+    assert len(out) == 1 and out[0]["cited_by"] == 887 and out[0]["doi"] == "10.4324/9781315042565"
+    # Même titre, autre année ou autre premier auteur ; titre principal trop court : des œuvres distinctes.
+    assert len(deduplicate([book("Classwide Peer Tutoring: a", "Joe Delquadri", 1986),
+                            book("Classwide Peer Tutoring: b", "Debra M. Kamps", 1994)])) == 2
+    assert len(deduplicate([book("Peer tutoring: a", "Joe Delquadri", 1986),
+                            book("Peer tutoring: b", "Joe Delquadri", 1986)])) == 2
+
+
 def test_parse_score():
     assert rank.parse_score('{"score": 2}') == 2
     assert rank.parse_score('{"score": 7}') == 3
@@ -138,6 +151,28 @@ def test_core_terms_add_most_cited_by_title():
             mock.patch.object(search, "lookup_dois", return_value={}):
         out = search.search([], [], 10, core=["peer learning", "peer tutoring"])
     assert [r["title"] for r in out] == ["Classique peer learning", "Classique peer tutoring"]
+
+
+def test_hal_requires_one_core_concept_not_every_word():
+    from providers import hal
+    reply = mock.Mock()
+    reply.json.return_value = {"response": {"docs": []}}
+    with mock.patch.object(hal.HTTP, "get", return_value=reply) as get:
+        hal.search("peer learning comparative study", 10, core=["peer learning", 'tutorat "entre" pairs'])
+        hal.search("peer learning comparative study", 10, lang="fr")
+    with_core, plain = (c.kwargs["params"] for c in get.call_args_list)
+    # Un des concepts (expression exacte) est exigé ; les autres mots ne font que classer.
+    assert with_core["q"] == '+("peer learning" OR "tutorat entre pairs") peer learning comparative study'
+    assert with_core["q.op"] == "OR"
+    assert plain["q"] == "(peer learning comparative study)" and "q.op" not in plain and plain["fq"] == "language_s:fr"
+
+    # Seules les bases qui exigent tous les mots (HAL, TEL, DUMAS) reçoivent les concepts.
+    hal_fn, eric_fn = mock.Mock(return_value=[]), mock.Mock(return_value=[])
+    with contextlib.redirect_stdout(io.StringIO()), mock.patch.dict(providers.SOURCES["hal"], fn=hal_fn), \
+            mock.patch.dict(providers.SOURCES["eric"], fn=eric_fn), mock.patch.object(search, "most_cited", return_value=[]):
+        search.search(["q"], ["hal", "eric"], 10, core=["peer learning"])
+    hal_fn.assert_called_once_with("q", 10, None, core=["peer learning"])
+    eric_fn.assert_called_once_with("q", 10, None)
 
 
 def test_snowball_adds_works_cited_by_relevant_results():

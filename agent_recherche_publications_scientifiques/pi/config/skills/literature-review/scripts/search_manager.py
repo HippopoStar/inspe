@@ -53,7 +53,7 @@ def cmd_review(a):
     queries = a.fr + a.en
     # Le correcteur ne voit que ce texte : au 4e essai, « vs traditional teaching » dans le sujet faisait noter 3 des
     # articles sur l'enseignement traditionnel. Le concept central (--core) lui dit ce qu'un 3 doit étudier.
-    topic = (a.topic or " / ".join(queries)) + f"\nCore concept (a 3 must study it): {' / '.join(a.core)}"
+    topic = (a.topic or " / ".join(queries)) + f"\nCore concepts (a 3 must study one of them): {' / '.join(a.core)}"
     scorer = rank.ollama_scorer(a.model)
     records = search.search(queries, a.sources, a.max_results, core=a.core)
     rank.grade(records, topic, scorer)
@@ -132,7 +132,8 @@ def build_parser():
     p.add_argument("--fr", nargs="+", required=True, help="requêtes en français")
     p.add_argument("--en", nargs="+", required=True, help="requêtes en anglais")
     p.add_argument("--core", nargs="+", required=True,
-                   help="concept central et synonymes, 1 à 3 mots chacun, FR et EN : leurs travaux les plus cités sont ajoutés")
+                   help="chaque concept nommé par l'utilisateur, FR et EN, 1 à 3 mots chacun : leurs travaux les plus cités "
+                        "sont ajoutés, HAL/TEL/DUMAS en exigent un")
     p.add_argument("--snowball", type=int, default=10,
                    help="nombre maximal de travaux ajoutés parce que plusieurs notices pertinentes les citent (0 = aucun)")
     search_options(p)

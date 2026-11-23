@@ -32,7 +32,7 @@ Tout tourne en local (Ollama), réglé pour un GPU de 4 Go (RTX 3050).
 ```
 
 Pi lance une seule commande (`search_manager.py review`, voir [SKILL.md](pi/config/skills/literature-review/SKILL.md)). Elle :
-1. interroge les bases en français et en anglais, et ajoute les travaux les plus cités portant le concept central (`--core`) dans leur titre ;
+1. interroge les bases en français et en anglais, et ajoute les travaux les plus cités portant un concept central (`--core`) dans leur titre ; HAL, TEL et DUMAS exigent l'un de ces concepts plutôt que tous les mots de la requête ;
 2. fusionne les doublons ;
 3. complète citations et PDF légaux via OpenAlex ;
 4. note chaque résumé de 0 à 3 avec le LLM ;
