@@ -6,6 +6,7 @@ from records import deduplicate
 
 def usable_sources(names: list) -> list:
     """« all » = toutes les bases accessibles ; une base dont la clé obligatoire manque est ignorée."""
+    names = " ".join(names).split()  # « hal tel » entre guillemets = « hal » « tel »
     names = available() if "all" in names else names
     for name in names:
         if status(name) == "clé manquante":

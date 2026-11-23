@@ -106,6 +106,20 @@ def test_review_requires_both_languages():
             pass
 
 
+def test_sources_quoted_or_not():
+    parser = search_manager.build_parser()
+    base = ["review", "--dir", "x", "--fr", "a", "--en", "b", "--sources"]
+    for argv in (["hal tel", "eric"], ["hal", "tel", "eric"]):
+        with contextlib.redirect_stdout(io.StringIO()):
+            assert search.usable_sources(parser.parse_args(base + argv).sources) == ["hal", "tel", "eric"]
+    with contextlib.redirect_stderr(io.StringIO()):
+        try:
+            parser.parse_args(base + ["hal scihub"])
+            raise AssertionError("base inconnue acceptée")
+        except SystemExit:
+            pass
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

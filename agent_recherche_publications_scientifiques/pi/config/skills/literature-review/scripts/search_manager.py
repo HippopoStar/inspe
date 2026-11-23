@@ -73,6 +73,14 @@ def cmd_sources(a):
     print(f"\nAccessibles ({len(available())}) : {' '.join(available())}")
 
 
+def source_names(value: str) -> str:
+    """Accepte aussi « --sources "hal tel" » : l'agent met parfois la liste entre guillemets."""
+    unknown = [n for n in value.split() if n not in SOURCES and n != "all"]
+    if unknown:
+        raise argparse.ArgumentTypeError(f"base inconnue : {' '.join(unknown)} (choix : {' '.join(SOURCES)} all)")
+    return value
+
+
 def build_parser():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -85,8 +93,8 @@ def build_parser():
         return p
 
     def search_options(p):
-        p.add_argument("--sources", nargs="+", default=["openalex", "hal", "crossref"],
-                       choices=[*SOURCES, "all"], help="« all » = toutes les bases accessibles")
+        p.add_argument("--sources", nargs="+", default=["openalex", "hal", "crossref"], type=source_names,
+                       help=f"parmi : {' '.join(SOURCES)} ; « all » = toutes les bases accessibles")
         p.add_argument("--max-results", type=int, default=10, help="par requête et par base")
 
     def rank_options(p, topic_required):
