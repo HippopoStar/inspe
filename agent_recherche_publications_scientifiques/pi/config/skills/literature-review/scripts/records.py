@@ -1,0 +1,99 @@
+"""La notice : format commun à toutes les bases, et fusion des doublons."""
+import re
+import unicodedata
+
+# Types RIS, repris tels quels par l'export Zotero.
+RIS_TYPES = ("JOUR", "THES", "CHAP", "BOOK", "CONF", "RPRT", "GEN")
+
+
+def first(value):
+    """Premier élément si `value` est une liste (les API Solr renvoient souvent des listes)."""
+    if isinstance(value, list):
+        return value[0] if value else ""
+    return "" if value is None else value
+
+
+def ascii_slug(text: str, max_len: int) -> str:
+    text = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[-\s]+", "_", re.sub(r"[^\w\s-]", "", text).strip())
+    return text[:max_len].strip("_") or "document"
+
+
+def normalize_doi(doi: str) -> str:
+    return re.sub(r"^https?://(dx\.)?doi\.org/", "", (doi or "").lower().strip())
+
+
+def normalize_title(title: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", ascii_slug(title, 10_000).lower())
+
+
+def make_record(source: str, doc_id: str, title: str, authors: list, year, abstract: str = "",
+                pdf_url: str = "", doi: str = "", *, item_type: str = "GEN", container="", volume="",
+                issue="", pages="", language="", url: str = "", cited_by=None, citation_percentile=None) -> dict:
+    authors = [a for a in (authors or []) if a]
+    year = str(year)[:4] if year else "0000"
+    return {
+        "id": f"{source}:{doc_id}",
+        "source": source,
+        "type": item_type if item_type in RIS_TYPES else "GEN",
+        "title": " ".join((first(title) or "").split()),
+        "authors": authors,
+        "year": year,
+        "container": str(first(container) or "").strip(),
+        "volume": str(first(volume) or ""),
+        "issue": str(first(issue) or ""),
+        "pages": str(first(pages) or ""),
+        "language": str(first(language) or ""),
+        "doi": normalize_doi(doi),
+        "url": url or "",
+        "abstract": " ".join((abstract or "").split()),
+        "pdf_url": pdf_url or "",
+        "cited_by": cited_by,                        # None = inconnu, différent de 0
+        "citation_percentile": citation_percentile,  # 0-1, corrigé de l'âge et du domaine (OpenAlex)
+        "cited_by_results": 0,                       # notices pertinentes de la liste qui la citent (enrich.snowball)
+    }
+
+
+def fill_gaps(target: dict, other: dict):
+    for key, value in other.items():
+        if target.get(key) in (None, "", []) and value not in (None, "", []):
+            target[key] = value
+
+
+def _work_key(rec: dict) -> str:
+    """Même œuvre sous deux titres (« X : sous-titre » et « X ») sans DOI commun : titre avant les deux-points, année et
+    nom du premier auteur. Au 5e essai, le livre de Boud apparaissait deux fois. Au moins 3 mots, pour ne pas confondre
+    deux chapitres « Introduction : … » d'un même auteur."""
+    main = rec["title"].split(":")[0]
+    if len(main.split()) < 3 or not rec["authors"] or rec["year"] == "0000":
+        return ""
+    author = rec["authors"][0]
+    surname = author.split(",")[0] if "," in author else author.split()[-1]   # « Boud, David » ou « David Boud »
+    return f"work:{normalize_title(main)}:{rec['year']}:{normalize_title(surname)}"
+
+
+def match_keys(rec: dict) -> list:
+    """Clés d'identité d'une notice : deux notices partageant une clé sont le même document."""
+    return [k for k in (f"doi:{rec['doi']}" if rec["doi"] else "",
+                        f"title:{normalize_title(rec['title'])}" if rec["title"] else "",
+                        _work_key(rec) if rec["title"] else "") if k]
+
+
+def deduplicate(records: list) -> list:
+    """Fusionne les notices de même DOI ou de même titre ; garde celle qui a un PDF et complète ses champs vides."""
+    unique, position = [], {}
+    for rec in records:
+        keys = match_keys(rec)
+        pos = next((position[k] for k in keys if k in position), None)
+        if pos is None:
+            pos = len(unique)
+            unique.append(rec)
+        else:
+            kept = unique[pos]
+            if rec["pdf_url"] and not kept["pdf_url"]:
+                kept, rec = rec, kept
+                unique[pos] = kept
+            fill_gaps(kept, rec)
+        for k in keys:
+            position[k] = pos
+    return unique

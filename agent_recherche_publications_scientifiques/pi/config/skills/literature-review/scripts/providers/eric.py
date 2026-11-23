@@ -1,30 +1,32 @@
-from utils import HTTP_SESSION, build_url, make_record, sanitize_lucene_query
+"""ERIC (sciences de l'éducation, sans clé)."""
+from net import HTTP, lucene_safe
+from records import make_record
+
+URL = "https://api.ies.ed.gov/eric/"
+FIELDS = "id,title,author,publicationdateyear,description,url,e_fulltextauth,source,publicationtype,language"
+TYPES = {"Journal Articles": "JOUR", "Dissertations": "THES", "Books": "BOOK", "Reports": "RPRT"}
 
 
-def search(query: str, max_results: int, lang: str = None) -> list:
-    url = build_url("api.ies.ed.gov", "/eric/")
-    safe_query = sanitize_lucene_query(query)
-    params = {
-        "search": safe_query,
-        "rows": max_results,
-        "format": "json",
-        "fields": "id,title,author,publicationdateyear,description,url,e_fulltextauth",
-    }
-    r = HTTP_SESSION.get(url, params=params, timeout=20)
+def _type(pub_types: list) -> str:
+    joined = " ".join(pub_types or [])
+    return next((ris for label, ris in TYPES.items() if label in joined), "GEN")
+
+
+def search(query: str, max_results: int, lang: str = None, boolean: bool = False) -> list:
+    """boolean : `query` est une équation déjà sûre (search.equation), passée telle quelle."""
+    r = HTTP.get(URL, timeout=20, params={"search": query if boolean else lucene_safe(query), "rows": max_results,
+                                          "format": "json", "fields": FIELDS})
     r.raise_for_status()
-
     results = []
     for d in r.json().get("response", {}).get("docs", []):
         eric_id = d.get("id", "")
-        pdf_url = build_url("files.eric.ed.gov", f"/fulltext/{eric_id}.pdf") if d.get("e_fulltextauth") == 1 else d.get("url", "")
         results.append(make_record(
-            source="eric",
-            doc_id=eric_id,
-            title=d.get("title", ""),
-            authors=d.get("author", []),
-            year=d.get("publicationdateyear"),
-            abstract=d.get("description", ""),
-            pdf_url=pdf_url,
+            # ERIC termine une liste d'auteurs tronquée par « And Others » : ce n'est pas un auteur.
+            "eric", eric_id, d.get("title"), [a for a in d.get("author") or [] if a != "And Others"],
+            d.get("publicationdateyear"), d.get("description"),
+            # Le champ `url` est une page éditeur, pas un PDF.
+            f"https://files.eric.ed.gov/fulltext/{eric_id}.pdf" if d.get("e_fulltextauth") == 1 else "",
+            item_type=_type(d.get("publicationtype")), container=d.get("source", ""),
+            language=d.get("language"), url=d.get("url") or f"https://eric.ed.gov/?id={eric_id}",
         ))
     return results
-

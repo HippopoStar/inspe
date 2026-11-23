@@ -1,0 +1,8 @@
+# Données locales : résultats de recherche, sessions de Pi, clés API
+workspace/*
+!workspace/.gitkeep
+pi/config/sessions/*
+!pi/config/sessions/.gitkeep
+secrets/*
+!secrets/README.md
+.env
