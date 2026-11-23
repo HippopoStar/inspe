@@ -24,20 +24,23 @@ def to_ris(records: list) -> str:
                   ("AB", r["abstract"]),
                   ("N1", f"Pertinence : {r.get('relevance')}/3 ; citations : "
                          f"{'inconnu' if r['cited_by'] is None else r['cited_by']} ; source : {r['id']}"
+                         + (f" ; cité par {r['cited_by_results']} notices pertinentes de la liste" if r.get("cited_by_results") else "")
                          + (f" ; PDF : {r['pdf_url']}" if r["pdf_url"] else ""))]
         lines += [f"{tag}  - {value}" for tag, value in fields if value not in (None, "")] + ["ER  - ", ""]
     return "\n".join(lines)
 
 
 def to_markdown(records: list) -> str:
-    rows = ["| # | Pertinence | Citations | Percentile | Année | Titre | Auteurs | DOI | PDF |",
-            "|---|---|---|---|---|---|---|---|---|"]
+    # « Ajouté car » : travaux ajoutés par la boule de neige, avec le nombre de notices pertinentes qui les citent.
+    rows = ["| # | Pertinence | Citations | Percentile | Ajouté car | Année | Titre | Auteurs | DOI | PDF |",
+            "|---|---|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(records, 1):
         authors = r["authors"][0] + (" et al." if len(r["authors"]) > 1 else "") if r["authors"] else ""
         pct = r["citation_percentile"]
         pdf = f"[lien]({r['pdf_url']})" if r["pdf_url"] else "non"
         cells = (i, f"{r.get('relevance')} ({LABELS.get(r.get('relevance'), '?')})",
                  "?" if r["cited_by"] is None else r["cited_by"], "?" if pct is None else f"{round(pct * 100)} %",
+                 f"cité par {r['cited_by_results']}" if r.get("cited_by_results") else "",
                  r["year"], r["title"], authors, r["doi"], pdf)
         rows.append("| " + " | ".join(str(c).replace("|", "/") for c in cells) + " |")
     return "\n".join(rows) + "\n"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sélection de publications sur un thème : search -> rank -> export.
+"""Sélection de publications sur un thème : search -> snowball -> rank -> export.
 
 `review` enchaîne tout en une commande (un seul appel d'outil pour l'agent). Dossier de thème produit :
 metadata.json (toutes les notices), selection.ris (import Zotero), SELECTION.md (tableau avec liens).
@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import export
 import rank
 import search
+import snowball
 from providers import SOURCES, NOT_INTEGRATED, available, status
 
 
@@ -39,8 +40,12 @@ def cmd_review(a):
     a.dir = dated(a.dir)
     # Requêtes FR et EN obligatoires, sans filtre de langue : les deux langues conviennent toujours.
     queries = a.fr + a.en
-    records = rank.rank(search.search(queries, a.sources, a.max_results, core=a.core), a.topic or " / ".join(queries),
-                        rank.ollama_scorer(a.model), a.citation_weight)
+    topic, scorer = a.topic or " / ".join(queries), rank.ollama_scorer(a.model)
+    records = search.search(queries, a.sources, a.max_results, core=a.core)
+    rank.grade(records, topic, scorer)
+    added = snowball.snowball(records, a.min_relevance, a.snowball)   # classiques cités par les notices pertinentes
+    rank.grade(added, topic, scorer)
+    records = rank.order(records + added, a.citation_weight)
     save(a.dir, records)
     keep = rank.selected(records, a.min_relevance, a.top)
     print(f"\n{len(keep)}/{len(records)} publication(s) retenue(s) (pertinence ≥ {a.min_relevance}, {a.top} au plus). "
@@ -113,6 +118,8 @@ def build_parser():
     p.add_argument("--en", nargs="+", required=True, help="requêtes en anglais")
     p.add_argument("--core", nargs="+", required=True,
                    help="concept central et synonymes, 1 à 3 mots chacun, FR et EN : leurs travaux les plus cités sont ajoutés")
+    p.add_argument("--snowball", type=int, default=10,
+                   help="nombre maximal de travaux ajoutés parce que plusieurs notices pertinentes les citent (0 = aucun)")
     search_options(p)
     rank_options(p, False)
     selection_option(p)

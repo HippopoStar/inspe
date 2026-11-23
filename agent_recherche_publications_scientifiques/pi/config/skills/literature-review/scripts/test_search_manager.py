@@ -70,7 +70,7 @@ def test_openalex_completes_citations_and_pdf():
 def test_export_ris_and_markdown():
     r = rec("openalex", "W1", "Titre | avec barre", doi="10.1/x", item_type="JOUR", container="Revue",
             volume="4", issue="2", pages="10-25", pdf_url="https://x/a.pdf")
-    r["relevance"] = 3
+    r["relevance"], r["cited_by_results"] = 3, 7
     with tempfile.TemporaryDirectory() as d:
         export.write([r], d)
         ris = open(os.path.join(d, "selection.ris"), encoding="utf-8").read()
@@ -78,9 +78,9 @@ def test_export_ris_and_markdown():
         assert sorted(os.listdir(d)) == ["SELECTION.md", "selection.ris"]   # aucun PDF téléchargé : liens seulement
     for line in ("TY  - JOUR", "AU  - Drot-Delange, Béatrice", "AU  - Parriaux, Gabriel", "PY  - 2013",
                  "T2  - Revue", "VL  - 4", "IS  - 2", "SP  - 10", "EP  - 25", "DO  - 10.1/x",
-                 "ER  - ", "citations : inconnu ; source : openalex:W1 ; PDF : https://x/a.pdf"):
+                 "ER  - ", "citations : inconnu ; source : openalex:W1 ; cité par 7 notices pertinentes de la liste ; PDF : https://x/a.pdf"):
         assert line in ris, line
-    assert "Titre / avec barre" in md and "| ? |" in md and "| [lien](https://x/a.pdf) |" in md
+    assert "Titre / avec barre" in md and "| ? |" in md and "| [lien](https://x/a.pdf) |" in md and "| cité par 7 |" in md
 
 
 def test_secrets_drive_source_status():
@@ -140,6 +140,26 @@ def test_core_terms_add_most_cited_by_title():
     with contextlib.redirect_stdout(io.StringIO()):
         out = search.search([], [], 10, core=["peer learning", "peer tutoring"])
     assert [r["title"] for r in out] == ["Classique peer learning", "Classique peer tutoring"]
+
+
+def test_snowball_adds_works_cited_by_relevant_results():
+    import snowball
+    a = rec("openalex", "W1", "A", abstract="r"); a["relevance"] = 3
+    b = rec("hal", "b", "B", doi="10.1/b"); b["relevance"] = 2
+    c = rec("openalex", "W3", "C"); c["relevance"] = 0                 # hors sujet : ne cite pas pour la liste
+    calls = []
+    # A cite W9, W8 et W3 (déjà dans la liste) ; B (trouvée par DOI, id W2) cite W9, W8 et W7 ; C cite W7 mais est écartée.
+    snowball.openalex.references = lambda dois, ids: calls.append((dois, ids)) or [
+        ("W1", "", ["W9", "W8", "W3"]), ("W2", "10.1/b", ["W9", "W8", "W7"])]
+    snowball.openalex.works = lambda ids: [rec("openalex", w, f"Classique {w}", doi=d, cited_by=50, citation_percentile=0.9)
+                                           for w, d in (("W9", "10.9/x"), ("W8", "10.1/b"))]   # W8 = B, déjà dans la liste
+    with contextlib.redirect_stdout(io.StringIO()):
+        added = snowball.snowball([a, b, c], 2, 10, min_citers=2)
+        assert snowball.snowball([a, b, c], 2, 0) == []                           # --snowball 0 : désactivé
+    assert calls == [(["10.1/b"], ["W1"])]                                       # relevantes seulement, A par id
+    assert [(r["id"], r["cited_by_results"]) for r in added] == [("openalex:W9", 2)]
+    assert (b["cited_by"], b["citation_percentile"], b["cited_by_results"]) == (50, 0.9, 2)   # B complétée, pas dupliquée
+    assert snowball.snowball([c], 2, 10) == []                                    # aucune notice pertinente
 
 
 def test_review_folder_is_dated():

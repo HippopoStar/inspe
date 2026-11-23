@@ -61,6 +61,28 @@ def most_cited(phrase: str, max_results: int) -> list:
                                      **{"per-page": max_results})]
 
 
+def _wid(url: str) -> str:
+    return (url or "").rsplit("/", 1)[-1]
+
+
+def references(dois: list, ids: list) -> list:
+    """[(id OpenAlex, DOI, [ids des travaux cités])] des travaux trouvés par DOI ou par id OpenAlex (50 par requête)."""
+    found = []
+    for field, values in (("doi", sorted({normalize_doi(d) for d in dois if d})), ("openalex", sorted(set(ids)))):
+        for i in range(0, len(values), 50):
+            for w in _get(filter=f"{field}:" + "|".join(values[i:i + 50]), select="id,doi,referenced_works",
+                          **{"per-page": 50}):
+                found.append((_wid(w.get("id")), normalize_doi(w.get("doi")),
+                              [_wid(u) for u in w.get("referenced_works") or []]))
+    return found
+
+
+def works(ids: list) -> list:
+    """Notices complètes pour des ids OpenAlex."""
+    return [_record(w) for i in range(0, len(ids), 50)
+            for w in _get(filter="openalex:" + "|".join(ids[i:i + 50]), **{"per-page": 50})]
+
+
 def lookup_dois(dois: list) -> dict:
     """{doi: {cited_by, citation_percentile, pdf_url}} pour une liste de DOI (50 par requête)."""
     dois, found = sorted({normalize_doi(d) for d in dois if d}), {}

@@ -53,18 +53,23 @@ def make_record(source: str, doc_id: str, title: str, authors: list, year, abstr
     }
 
 
-def _fill_gaps(target: dict, other: dict):
+def fill_gaps(target: dict, other: dict):
     for key, value in other.items():
         if target.get(key) in (None, "", []) and value not in (None, "", []):
             target[key] = value
+
+
+def match_keys(rec: dict) -> list:
+    """Clés d'identité d'une notice : deux notices partageant une clé sont le même document."""
+    return [k for k in (f"doi:{rec['doi']}" if rec["doi"] else "",
+                        f"title:{normalize_title(rec['title'])}" if rec["title"] else "") if k]
 
 
 def deduplicate(records: list) -> list:
     """Fusionne les notices de même DOI ou de même titre ; garde celle qui a un PDF et complète ses champs vides."""
     unique, position = [], {}
     for rec in records:
-        keys = [k for k in (f"doi:{rec['doi']}" if rec["doi"] else "",
-                            f"title:{normalize_title(rec['title'])}" if rec["title"] else "") if k]
+        keys = match_keys(rec)
         pos = next((position[k] for k in keys if k in position), None)
         if pos is None:
             pos = len(unique)
@@ -74,7 +79,7 @@ def deduplicate(records: list) -> list:
             if rec["pdf_url"] and not kept["pdf_url"]:
                 kept, rec = rec, kept
                 unique[pos] = kept
-            _fill_gaps(kept, rec)
+            fill_gaps(kept, rec)
         for k in keys:
             position[k] = pos
     return unique

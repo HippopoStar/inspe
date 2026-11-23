@@ -64,7 +64,8 @@ def sort_key(rec: dict, citation_weight: float):
     return (rec["relevance"] + citation_weight * (rec.get("citation_percentile") or 0), rec.get("cited_by") or 0)
 
 
-def rank(records: list, topic: str, scorer, citation_weight: float = CITATION_WEIGHT) -> list:
+def grade(records: list, topic: str, scorer):
+    """Note la pertinence (0-3) de chaque notice, sur place."""
     for i, rec in enumerate(records, 1):
         try:
             score = scorer(topic, rec)
@@ -76,8 +77,17 @@ def rank(records: list, topic: str, scorer, citation_weight: float = CITATION_WE
             print(f"[rank] {rec['id']} : échec ({e})")
         if i % 25 == 0 or i == len(records):  # peu de lignes : toute la sortie revient dans le contexte de l'agent
             print(f"[rank] {i}/{len(records)} notées")
-    print("[rank] notes : " + ", ".join(f"{k} = {sum(r['relevance'] == k for r in records)}" for k in (3, 2, 1, 0)))
+    if records:
+        print("[rank] notes : " + ", ".join(f"{k} = {sum(r['relevance'] == k for r in records)}" for k in (3, 2, 1, 0)))
+
+
+def order(records: list, citation_weight: float = CITATION_WEIGHT) -> list:
     return sorted(records, key=lambda r: sort_key(r, citation_weight), reverse=True)
+
+
+def rank(records: list, topic: str, scorer, citation_weight: float = CITATION_WEIGHT) -> list:
+    grade(records, topic, scorer)
+    return order(records, citation_weight)
 
 
 def selected(records: list, min_relevance: int, top: int = None) -> list:

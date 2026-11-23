@@ -48,5 +48,5 @@ Answer in a few lines, in the user's language, with the folder path printed by t
 - `<printed folder>/selection.ris` is to be imported into Zotero (File > Import);
 - the `PDF` column of `SELECTION.md` links to open-access PDFs (`[lien]`); nothing was downloaded. To query a PDF in Open WebUI, the user downloads it and uploads it to a Knowledge collection.
 
-The selection keeps the 20 best results, ranked by relevance plus citations. If the user wants more or fewer, run again with `--top` (default 20) or `--min-relevance` (default 2); `--citation-weight` (default 1, 0 = relevance only) sets how much citations count.
+The selection keeps the 20 best results, ranked by relevance plus citations. If the user wants more or fewer, run again with `--top` (default 20) or `--min-relevance` (default 2); `--citation-weight` (default 1, 0 = relevance only) sets how much citations count. The command also adds up to 10 works cited by at least 3 relevant results (`--snowball`, 0 = none): the `Ajouté car` column of the table says how many results cite each one.
 To see which databases are accessible: `search_manager.py sources --check`.
