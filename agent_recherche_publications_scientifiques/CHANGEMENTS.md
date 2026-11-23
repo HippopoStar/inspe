@@ -34,18 +34,20 @@
 - Barème de notation strict (le concept central doit être étudié, au moindre doute la note basse) : au premier essai, 179 notices sur 302 avaient reçu 2, dont un article sur les poèmes d'Ossian.
 
 **Classement**
-- Ordre : pertinence 0-3, puis percentile de citations OpenAlex (corrigé de l'âge et du domaine), puis citations brutes.
+- Score = pertinence 0-3 + 2 × percentile de citations OpenAlex (corrigé de l'âge et du domaine), puis citations brutes à égalité. Au début, les citations ne départageaient que les notices de même note : une notice « pertinent » très citée ne passait jamais devant une « au cœur du sujet » jamais citée. Le poids se règle avec `--citation-weight` (0 = pertinence seule).
+- Les citations ne font jamais entrer une notice sous `--min-relevance` : le filtre de pertinence passe avant le classement.
 - Les citations viennent toutes d'OpenAlex : des chiffres de bases différentes ne sont pas comparables.
 - Une notice sans résumé est notée 2 au plus : sur le titre seul, le modèle donnait 3 à des textes hors sujet.
 - Seules les 20 mieux classées sont retenues (`--top`), et la commande n'affiche qu'un résumé. Toute sa sortie revient dans le contexte 8k de l'agent : au premier essai, 223 lignes l'avaient fait dérailler.
 
 **Zotero**
 - Chaque notice a son type, sa revue, son volume, son numéro, ses pages, sa langue, tous ses auteurs et son résumé complet.
-- Export `.ris` avec PDF joints.
+- Export `.ris` ; le lien PDF est dans la note de chaque notice.
+- Aucun PDF n'est téléchargé : le lien (légal, via OpenAlex/Unpaywall ou la base d'origine) suffit, et la commande n'a plus à affronter l'anti-robot de HAL. Pour interroger un PDF dans Open WebUI, on le télécharge soi-même depuis le lien.
 
 **Open WebUI**
 - Embeddings multilingues (`BAAI/bge-m3`) : le modèle par défaut ne gère que l'anglais.
-- Le montage `workspace` dans Open WebUI est supprimé : il n'était pas indexé. Les PDF se chargent dans une collection.
+- Le montage `workspace` dans Open WebUI est supprimé : il n'était pas indexé. Les PDF téléchargés à la main se chargent dans une collection.
 
 **Docker**
 - Les clés API sont des `secrets`, avec un fichier vide quand il n'y a pas de clé.
@@ -54,7 +56,7 @@
 - `workspace/` et `pi/config/sessions/` sont ignorés par git.
 
 **Code**
-- Une étape par module : `search`, `rank`, `pdf`, `export`.
+- Une étape par module : `search`, `rank`, `export`.
 - Format de notice commun (`records.py`) et accès réseau partagé (`net.py`).
 - Un module par base, plus un registre.
 - Test hors ligne (`test_search_manager.py`).
@@ -91,7 +93,7 @@
 
 - **Recherche :** 14 bases répondent. 54 notices uniques sur 8 bases ; OpenAlex en a complété 26 (citations ou PDF légal).
 - **Échecs sans clé :** OpenAlex (erreur 525), Semantic Scholar (429), CORE (saturé).
-- **HAL :** ses PDF sont derrière une page anti-robot ; le script le signale et donne le lien.
+- **HAL :** ses PDF sont derrière une page anti-robot : un navigateur les ouvre, pas un script. D'où le choix de ne donner que le lien.
 - **Non testé ici :**
   - la notation par le LLM ;
   - l'import Zotero ;
@@ -101,5 +103,5 @@
 
 - Noms de famille composés mal coupés dans le `.ris` : à corriger dans Zotero.
 - Année HAL parfois égale à la date de dépôt.
-- PDF scannés sans OCR.
+- Les PDF scannés téléversés dans Open WebUI restent vides sans OCR.
 - 16 Go de RAM : pas de place pour un modèle plus gros.

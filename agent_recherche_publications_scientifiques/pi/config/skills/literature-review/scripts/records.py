@@ -32,7 +32,6 @@ def make_record(source: str, doc_id: str, title: str, authors: list, year, abstr
                 issue="", pages="", language="", url: str = "", cited_by=None, citation_percentile=None) -> dict:
     authors = [a for a in (authors or []) if a]
     year = str(year)[:4] if year else "0000"
-    family = authors[0].replace(",", " ").split()[0 if "," in authors[0] else -1] if authors else "Unknown"
     return {
         "id": f"{source}:{doc_id}",
         "source": source,
@@ -51,7 +50,6 @@ def make_record(source: str, doc_id: str, title: str, authors: list, year, abstr
         "pdf_url": pdf_url or "",
         "cited_by": cited_by,                        # None = inconnu, différent de 0
         "citation_percentile": citation_percentile,  # 0-1, corrigé de l'âge et du domaine (OpenAlex)
-        "suggested_filename": f"{year}_{ascii_slug(family, 20)}_{ascii_slug(first(title), 45)}.pdf",
     }
 
 

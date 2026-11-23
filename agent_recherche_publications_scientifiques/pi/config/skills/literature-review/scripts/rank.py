@@ -7,6 +7,7 @@ import requests
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
 RANK_MODEL = os.environ.get("RANK_MODEL", "qwen3:4b-instruct")
+CITATION_WEIGHT = 2.0   # voir sort_key ; 0 = classement par pertinence seule
 LABELS = {0: "hors sujet", 1: "lien indirect", 2: "pertinent", 3: "au cœur du sujet"}
 
 # En anglais : Qwen3 suit mieux des consignes en anglais. Barème strict : au premier essai, la quasi-totalité
@@ -51,13 +52,17 @@ def ollama_scorer(model: str = RANK_MODEL):
     return score
 
 
-def sort_key(rec: dict):
-    # ponytail: ordre pertinence > percentile de citations > citations brutes ; une valeur inconnue (None)
-    # passe après les connues. Remplacer par un score pondéré si ce classement ne convient pas.
-    return tuple(-1 if rec.get(k) is None else rec[k] for k in ("relevance", "citation_percentile", "cited_by"))
+def sort_key(rec: dict, citation_weight: float):
+    """Score = pertinence (0-3) + poids × percentile de citations (0-1), puis citations brutes à égalité.
+    Poids 2 : une notice « pertinent » (2) citée dans le top 1 % (≈ 4) passe devant une « au cœur du sujet » (3)
+    jamais citée. Le filtre `--min-relevance` reste appliqué avant : les citations ne font jamais entrer du hors-sujet.
+    Percentile inconnu = aucun bonus (pas une pénalité) ; non noté = en dernier."""
+    if rec.get("relevance") is None:
+        return (-1, -1)
+    return (rec["relevance"] + citation_weight * (rec.get("citation_percentile") or 0), rec.get("cited_by") or 0)
 
 
-def rank(records: list, topic: str, scorer) -> list:
+def rank(records: list, topic: str, scorer, citation_weight: float = CITATION_WEIGHT) -> list:
     for i, rec in enumerate(records, 1):
         try:
             score = scorer(topic, rec)
@@ -70,7 +75,7 @@ def rank(records: list, topic: str, scorer) -> list:
         if i % 25 == 0 or i == len(records):  # peu de lignes : toute la sortie revient dans le contexte de l'agent
             print(f"[rank] {i}/{len(records)} notées")
     print("[rank] notes : " + ", ".join(f"{k} = {sum(r['relevance'] == k for r in records)}" for k in (3, 2, 1, 0)))
-    return sorted(records, key=sort_key, reverse=True)
+    return sorted(records, key=lambda r: sort_key(r, citation_weight), reverse=True)
 
 
 def selected(records: list, min_relevance: int, top: int = None) -> list:

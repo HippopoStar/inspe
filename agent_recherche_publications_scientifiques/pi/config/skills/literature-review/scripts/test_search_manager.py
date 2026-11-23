@@ -48,9 +48,13 @@ def test_rank_order_and_selection():
     with contextlib.redirect_stdout(io.StringIO()) as out:
         ranked = rank.rank(records, "sujet", lambda topic, r: scores[r["title"]])
     assert out.getvalue().splitlines() == ["[rank] 5/5 notées", "[rank] notes : 3 = 2, 2 = 2, 1 = 0, 0 = 0"]
-    assert [r["title"] for r in ranked] == ["C", "A", "B", "E", "D"]
-    assert [r["title"] for r in rank.selected(ranked, 2)] == ["C", "A", "B", "E"]
-    assert [r["title"] for r in rank.selected(ranked, 2, top=2)] == ["C", "A"]
+    # Poids 2 par défaut : B (2 + 2 × 0,99) passe devant C (3 + 2 × 0,2) et A (3, jamais cité) ; sans résumé, E = 2.
+    assert [r["title"] for r in ranked] == ["B", "C", "A", "E", "D"]
+    assert [r["title"] for r in rank.selected(ranked, 2)] == ["B", "C", "A", "E"]
+    assert [r["title"] for r in rank.selected(ranked, 2, top=2)] == ["B", "C"]
+    with contextlib.redirect_stdout(io.StringIO()):   # poids 0 : pertinence d'abord, citations à égalité
+        by_relevance = rank.rank(records, "sujet", lambda topic, r: scores[r["title"]], citation_weight=0)
+    assert [r["title"] for r in by_relevance] == ["C", "A", "B", "E", "D"]
     assert "language (French or English) does not matter" in rank.PROMPT
 
 
@@ -64,19 +68,18 @@ def test_openalex_completes_citations_and_pdf():
 
 def test_export_ris_and_markdown():
     r = rec("openalex", "W1", "Titre | avec barre", doi="10.1/x", item_type="JOUR", container="Revue",
-            volume="4", issue="2", pages="10-25")
+            volume="4", issue="2", pages="10-25", pdf_url="https://x/a.pdf")
     r["relevance"] = 3
     with tempfile.TemporaryDirectory() as d:
-        os.makedirs(os.path.join(d, "pdfs"))
-        open(os.path.join(d, "pdfs", r["suggested_filename"]), "wb").close()
         export.write([r], d)
         ris = open(os.path.join(d, "selection.ris"), encoding="utf-8").read()
         md = open(os.path.join(d, "SELECTION.md"), encoding="utf-8").read()
+        assert sorted(os.listdir(d)) == ["SELECTION.md", "selection.ris"]   # aucun PDF téléchargé : liens seulement
     for line in ("TY  - JOUR", "AU  - Drot-Delange, Béatrice", "AU  - Parriaux, Gabriel", "PY  - 2013",
                  "T2  - Revue", "VL  - 4", "IS  - 2", "SP  - 10", "EP  - 25", "DO  - 10.1/x",
-                 f"L1  - {os.path.join('pdfs', r['suggested_filename'])}", "ER  - ", "citations : inconnu"):
+                 "ER  - ", "citations : inconnu ; source : openalex:W1 ; PDF : https://x/a.pdf"):
         assert line in ris, line
-    assert "Titre / avec barre" in md and "| ? |" in md and "| oui |" in md
+    assert "Titre / avec barre" in md and "| ? |" in md and "| [lien](https://x/a.pdf) |" in md
 
 
 def test_secrets_drive_source_status():

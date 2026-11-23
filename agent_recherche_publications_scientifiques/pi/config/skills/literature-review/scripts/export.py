@@ -1,7 +1,6 @@
-"""Étape 4 : selection.ris (import Zotero, PDF joints) et SELECTION.md (tableau lisible)."""
+"""Étape 3 : selection.ris (import Zotero) et SELECTION.md (tableau lisible, avec les liens PDF)."""
 import os
 
-from pdf import pdf_path
 from rank import LABELS
 
 
@@ -14,7 +13,7 @@ def ris_author(name: str) -> str:
     return f"{family}, {' '.join(given)}"
 
 
-def to_ris(records: list, theme_dir: str) -> str:
+def to_ris(records: list) -> str:
     lines = []
     for r in records:
         sp, _, ep = r["pages"].partition("-")
@@ -24,20 +23,19 @@ def to_ris(records: list, theme_dir: str) -> str:
                   ("DO", r["doi"]), ("UR", r["url"] or (f"https://doi.org/{r['doi']}" if r["doi"] else "")),
                   ("AB", r["abstract"]),
                   ("N1", f"Pertinence : {r.get('relevance')}/3 ; citations : "
-                         f"{'inconnu' if r['cited_by'] is None else r['cited_by']} ; source : {r['id']}")]
-        if os.path.exists(pdf_path(theme_dir, r)):
-            fields.append(("L1", os.path.join("pdfs", r["suggested_filename"])))  # relatif au .ris : Zotero joint le PDF
+                         f"{'inconnu' if r['cited_by'] is None else r['cited_by']} ; source : {r['id']}"
+                         + (f" ; PDF : {r['pdf_url']}" if r["pdf_url"] else ""))]
         lines += [f"{tag}  - {value}" for tag, value in fields if value not in (None, "")] + ["ER  - ", ""]
     return "\n".join(lines)
 
 
-def to_markdown(records: list, theme_dir: str) -> str:
+def to_markdown(records: list) -> str:
     rows = ["| # | Pertinence | Citations | Percentile | Année | Titre | Auteurs | DOI | PDF |",
             "|---|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(records, 1):
         authors = r["authors"][0] + (" et al." if len(r["authors"]) > 1 else "") if r["authors"] else ""
         pct = r["citation_percentile"]
-        pdf = "oui" if os.path.exists(pdf_path(theme_dir, r)) else (f"[lien]({r['pdf_url']})" if r["pdf_url"] else "non")
+        pdf = f"[lien]({r['pdf_url']})" if r["pdf_url"] else "non"
         cells = (i, f"{r.get('relevance')} ({LABELS.get(r.get('relevance'), '?')})",
                  "?" if r["cited_by"] is None else r["cited_by"], "?" if pct is None else f"{round(pct * 100)} %",
                  r["year"], r["title"], authors, r["doi"], pdf)
@@ -46,10 +44,10 @@ def to_markdown(records: list, theme_dir: str) -> str:
 
 
 def write(records: list, theme_dir: str) -> str:
-    """Écrit les deux fichiers et renvoie le tableau (affiché tel quel par l'agent)."""
+    """Écrit les deux fichiers et renvoie le tableau (affiché par la commande)."""
     with open(os.path.join(theme_dir, "selection.ris"), "w", encoding="utf-8") as f:
-        f.write(to_ris(records, theme_dir))
-    table = to_markdown(records, theme_dir)
+        f.write(to_ris(records))
+    table = to_markdown(records)
     with open(os.path.join(theme_dir, "SELECTION.md"), "w", encoding="utf-8") as f:
         f.write(f"# Sélection ({len(records)} publications)\n\n{table}")
     return table

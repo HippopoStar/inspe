@@ -37,14 +37,15 @@ Pi lance une seule commande (`search_manager.py review`, voir [SKILL.md](pi/conf
 3. complète citations et PDF légaux via OpenAlex ;
 4. note chaque résumé de 0 à 3 avec le LLM ;
 5. retient les 20 mieux classées de pertinence ≥ 2 (`--top`, `--min-relevance`) ;
-6. télécharge leurs PDF et écrit dans `workspace/AAAA-MM-JJ_HH-MM_<thème>/` (une recherche n'écrase jamais la précédente) :
+6. écrit dans `workspace/AAAA-MM-JJ_HH-MM_<thème>/` (une recherche n'écrase jamais la précédente). Aucun PDF n'est téléchargé : seuls les liens sont donnés.
 
 | Fichier | Contenu |
 |---|---|
-| `SELECTION.md` | tableau classé : pertinence, puis percentile de citations (corrigé de l'âge et du domaine), puis citations. `?` = inconnu, pas zéro |
-| `selection.ris` | à importer dans Zotero (Fichier > Importer), PDF joints |
-| `pdfs/` | PDF en accès libre. Les liens HAL sont bloqués par une page anti-robot : télécharger à la main (`[lien]` dans le tableau) |
+| `SELECTION.md` | tableau classé par score = pertinence (0-3) + 2 × percentile de citations (corrigé de l'âge et du domaine), puis citations. `?` = inconnu, pas zéro. Colonne PDF : `[lien]` vers le PDF en accès libre |
+| `selection.ris` | à importer dans Zotero (Fichier > Importer) ; le lien PDF est dans la note de chaque notice |
 | `metadata.json` | toutes les notices, y compris celles écartées |
+
+Le poids des citations se règle avec `--citation-weight` (2 par défaut ; 0 = pertinence seule). Il ne fait jamais entrer une notice sous `--min-relevance`.
 
 Vérifications :
 - Pendant une réponse, `docker exec ollama ollama ps` doit afficher `100% GPU`.
@@ -52,7 +53,7 @@ Vérifications :
 
 ## Interroger les PDF dans Open WebUI (<http://localhost:3000>)
 
-1. Espace de travail > Connaissances : une collection par thème, y téléverser `pdfs/` et `SELECTION.md`.
+1. Télécharger à la main les PDF voulus depuis les liens de `SELECTION.md`. Espace de travail > Connaissances : une collection par thème, y téléverser ces PDF et `SELECTION.md`.
 2. Dans une discussion, `#` puis la collection. Les réponses citent leurs passages : les vérifier.
 
 Limites :
@@ -63,11 +64,10 @@ Limites :
 
 | Fichier | Rôle |
 |---|---|
-| `search_manager.py` | ligne de commande : `review`, `search`, `rank`, `download`, `export`, `sources` |
+| `search_manager.py` | ligne de commande : `review`, `search`, `rank`, `export`, `sources` |
 | `search.py` | étape 1 : bases -> notices, doublons, complément OpenAlex |
 | `rank.py` | étape 2 : note de pertinence par le LLM, classement |
-| `pdf.py` | étape 3 : téléchargement des PDF |
-| `export.py` | étape 4 : `selection.ris` et `SELECTION.md` |
+| `export.py` | étape 3 : `selection.ris` et `SELECTION.md` |
 | `records.py` | format commun d'une notice, fusion des doublons |
 | `net.py` | session HTTP (délai, nouvelles tentatives), lecture des clés |
 | `providers/` | un module par base + registre `__init__.py` |

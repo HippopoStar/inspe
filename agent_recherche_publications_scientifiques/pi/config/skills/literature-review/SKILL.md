@@ -1,11 +1,11 @@
 ---
 name: literature-review
-description: Builds a selection of scientific publications on a topic (HAL, TEL, DUMAS, OpenAlex, Crossref, Cairn, Persée, OpenEdition, JSTOR, Taylor & Francis, ERIC, DOAJ, CORE, Semantic Scholar, plus Springer, Scopus and Web of Science when a key is provided), ranked by relevance and citation count, with PDFs and a Zotero export (selection.ris).
+description: Builds a selection of scientific publications on a topic (HAL, TEL, DUMAS, OpenAlex, Crossref, Cairn, Persée, OpenEdition, JSTOR, Taylor & Francis, ERIC, DOAJ, CORE, Semantic Scholar, plus Springer, Scopus and Web of Science when a key is provided), ranked by relevance and citation count, with links to open-access PDFs and a Zotero export (selection.ris).
 ---
 
 # Publication selection on a topic
 
-**Strict rule**: one single command does everything (search, grading, PDFs, export). Do not read `metadata.json`, do not write any script.
+**Strict rule**: one single command does everything (search, grading, export; PDFs are not downloaded, only linked). Do not read `metadata.json`, do not write any script.
 
 **Language**: French and English publications are always both fine. Always give queries in both languages (the command requires it) and never filter or prefer a language. Answer the user in the language they wrote in.
 
@@ -43,8 +43,7 @@ Do not copy the table: the user already sees the command output, and the table i
 Answer in a few lines, in the user's language, with the folder path printed by the command (it starts with the date):
 - how many publications were kept, and that the table is in `<printed folder>/SELECTION.md`;
 - `<printed folder>/selection.ris` is to be imported into Zotero (File > Import);
-- `<printed folder>/pdfs/` is to be uploaded to an Open WebUI Knowledge collection;
-- PDFs marked `[lien]` must be downloaded by hand (HAL blocks robots).
+- the `PDF` column of `SELECTION.md` links to open-access PDFs (`[lien]`); nothing was downloaded. To query a PDF in Open WebUI, the user downloads it and uploads it to a Knowledge collection.
 
-The selection keeps the 20 best results. If the user wants more or fewer, run again with `--top` (default 20) or `--min-relevance` (default 2).
+The selection keeps the 20 best results, ranked by relevance plus citations. If the user wants more or fewer, run again with `--top` (default 20) or `--min-relevance` (default 2); `--citation-weight` (default 2, 0 = relevance only) sets how much citations count.
 To see which databases are accessible: `search_manager.py sources --check`.

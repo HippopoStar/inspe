@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Sélection de publications sur un thème : search -> rank -> download -> export.
+"""Sélection de publications sur un thème : search -> rank -> export.
 
 `review` enchaîne tout en une commande (un seul appel d'outil pour l'agent). Dossier de thème produit :
-metadata.json (toutes les notices), pdfs/, selection.ris (import Zotero), SELECTION.md (tableau).
+metadata.json (toutes les notices), selection.ris (import Zotero), SELECTION.md (tableau avec liens).
 """
 import argparse
 import json
@@ -13,7 +13,6 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import export
-import pdf
 import rank
 import search
 from providers import SOURCES, NOT_INTEGRATED, available, status
@@ -41,10 +40,9 @@ def cmd_review(a):
     # Requêtes FR et EN obligatoires, sans filtre de langue : les deux langues conviennent toujours.
     queries = a.fr + a.en
     records = rank.rank(search.search(queries, a.sources, a.max_results), a.topic or " / ".join(queries),
-                        rank.ollama_scorer(a.model))
+                        rank.ollama_scorer(a.model), a.citation_weight)
     save(a.dir, records)
     keep = rank.selected(records, a.min_relevance, a.top)
-    pdf.download(keep, a.dir)
     print(f"\n{len(keep)}/{len(records)} publication(s) retenue(s) (pertinence ≥ {a.min_relevance}, {a.top} au plus). "
           f"Dossier : {a.dir}\n")
     print(export.write(keep, a.dir))
@@ -55,12 +53,7 @@ def cmd_search(a):
 
 
 def cmd_rank(a):
-    save(a.dir, rank.rank(load(a.dir), a.topic, rank.ollama_scorer(a.model)))
-
-
-def cmd_download(a):
-    records = load(a.dir)
-    pdf.download([r for r in records if r["id"] in a.ids] if a.ids else rank.selected(records, a.min_relevance, a.top), a.dir)
+    save(a.dir, rank.rank(load(a.dir), a.topic, rank.ollama_scorer(a.model), a.citation_weight))
 
 
 def cmd_export(a):
@@ -108,12 +101,14 @@ def build_parser():
     def rank_options(p, topic_required):
         p.add_argument("--topic", required=topic_required, help="le sujet en une phrase")
         p.add_argument("--model", default=rank.RANK_MODEL)
+        p.add_argument("--citation-weight", type=float, default=rank.CITATION_WEIGHT,
+                       help="poids des citations : score = pertinence + poids × percentile de citations (0 = pertinence seule)")
 
     def selection_option(p):
         p.add_argument("--min-relevance", type=int, default=2, help="note minimale (0-3) pour être retenu")
         p.add_argument("--top", type=int, default=20, help="nombre maximal de publications retenues (les mieux classées)")
 
-    p = command("review", cmd_review, "search + rank + download + export")
+    p = command("review", cmd_review, "search + rank + export")
     p.add_argument("--fr", nargs="+", required=True, help="requêtes en français")
     p.add_argument("--en", nargs="+", required=True, help="requêtes en anglais")
     search_options(p)
@@ -126,10 +121,6 @@ def build_parser():
     search_options(p)
 
     rank_options(command("rank", cmd_rank, "noter et classer metadata.json"), True)
-
-    p = command("download", cmd_download, "PDF des notices retenues (ou --ids)")
-    p.add_argument("--ids", nargs="+")
-    selection_option(p)
 
     selection_option(command("export", cmd_export, "selection.ris + SELECTION.md"))
 
