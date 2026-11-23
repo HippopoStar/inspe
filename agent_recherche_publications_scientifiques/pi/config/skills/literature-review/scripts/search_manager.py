@@ -51,7 +51,10 @@ def cmd_review(a):
     a.dir = review_dir(a)
     # Requêtes FR et EN obligatoires, sans filtre de langue : les deux langues conviennent toujours.
     queries = a.fr + a.en
-    topic, scorer = a.topic or " / ".join(queries), rank.ollama_scorer(a.model)
+    # Le correcteur ne voit que ce texte : au 4e essai, « vs traditional teaching » dans le sujet faisait noter 3 des
+    # articles sur l'enseignement traditionnel. Le concept central (--core) lui dit ce qu'un 3 doit étudier.
+    topic = (a.topic or " / ".join(queries)) + f"\nCore concept (a 3 must study it): {' / '.join(a.core)}"
+    scorer = rank.ollama_scorer(a.model)
     records = search.search(queries, a.sources, a.max_results, core=a.core)
     rank.grade(records, topic, scorer)
     enrich.complete_by_title(records, a.min_relevance)   # ERIC : ni DOI ni citations sans cette étape

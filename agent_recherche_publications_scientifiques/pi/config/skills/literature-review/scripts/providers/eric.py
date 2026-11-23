@@ -20,7 +20,9 @@ def search(query: str, max_results: int, lang: str = None) -> list:
     for d in r.json().get("response", {}).get("docs", []):
         eric_id = d.get("id", "")
         results.append(make_record(
-            "eric", eric_id, d.get("title"), d.get("author"), d.get("publicationdateyear"), d.get("description"),
+            # ERIC termine une liste d'auteurs tronquée par « And Others » : ce n'est pas un auteur.
+            "eric", eric_id, d.get("title"), [a for a in d.get("author") or [] if a != "And Others"],
+            d.get("publicationdateyear"), d.get("description"),
             # Le champ `url` est une page éditeur, pas un PDF.
             f"https://files.eric.ed.gov/fulltext/{eric_id}.pdf" if d.get("e_fulltextauth") == 1 else "",
             item_type=_type(d.get("publicationtype")), container=d.get("source", ""),

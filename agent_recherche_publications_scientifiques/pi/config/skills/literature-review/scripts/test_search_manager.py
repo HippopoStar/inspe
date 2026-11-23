@@ -201,6 +201,32 @@ def test_review_steps_run_in_order():
     assert calls == ["scorer", "search", "grade", "by_title", "snowball", "grade", "write"]
 
 
+def test_grader_receives_core_terms():
+    """Le correcteur ne voit que le sujet : sans le concept central, un sujet « X vs enseignement classique » fait noter 3 le classique."""
+    grade = mock.Mock()
+    with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()), \
+            mock.patch.object(rank, "ollama_scorer"), mock.patch.object(search, "search", return_value=[]), \
+            mock.patch.object(rank, "grade", grade), mock.patch.object(enrich, "complete_by_title"), \
+            mock.patch.object(enrich, "snowball", return_value=[]), mock.patch.object(export, "write", return_value=""):
+        search_manager.cmd_review(search_manager.build_parser().parse_args(
+            ["review", "--dir", os.path.join(d, "x"), "--topic", "Peer learning vs traditional teaching",
+             "--fr", "a", "--en", "b", "--core", "peer learning", "peer tutoring"]))
+    for call in grade.call_args_list:     # les travaux ajoutés par la boule de neige sont notés de la même façon
+        assert "Peer learning vs traditional teaching" in call.args[1] and "peer learning / peer tutoring" in call.args[1]
+    assert len(grade.call_args_list) == 2
+
+
+def test_eric_authors_drop_and_others():
+    from providers import eric
+    reply = mock.Mock()
+    reply.json.return_value = {"response": {"docs": [
+        {"id": "EJ1", "title": "T", "author": ["Lucker, G. William", "And Others"], "publicationdateyear": 1976},
+        {"id": "EJ2", "title": "U", "publicationdateyear": 2000}]}}      # sans auteur : liste vide, pas d'erreur
+    with mock.patch.object(eric.HTTP, "get", return_value=reply):
+        found = eric.search("peer", 2)
+    assert [r["authors"] for r in found] == [["Lucker, G. William"], []]
+
+
 def test_review_folder_is_dated_and_derived_from_core():
     import re
     parser = search_manager.build_parser()
