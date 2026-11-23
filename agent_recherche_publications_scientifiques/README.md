@@ -1,68 +1,76 @@
+# Agent de recherche de publications scientifiques
 
-<https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>  
-<https://docs.nvidia.com/aerial/framework/latest/installation/docker_and_nvidia_setup.html>  
-```
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
-  && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-sudo apt-get update && sudo apt-get -y install nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
-docker run --rm --gpus all --entrypoint "" ollama/ollama nvidia-smi
-```
+- **Pi** constitue une sélection de publications sur un thème, classée par pertinence et par citations, exportable dans Zotero.
+- **Open WebUI** permet d'interroger un agent sur le contenu des PDF retenus.
 
-**Clés API (facultatives, gratuites)**  
-Un fichier par clé dans `secrets/` (ignoré par git), monté dans `/run/secrets` du conteneur `pi`. La liste, l'effet de chaque clé et où l'obtenir sont dans [secrets/README.md](secrets/README.md). La clé OpenAlex est fortement recommandée (elle sert aussi aux citations de toutes les bases).
+Tout tourne en local (Ollama), réglé pour un GPU de 4 Go (RTX 3050).
 
-Bases accessibles selon les clés fournies (avec une vraie requête de test par base) :
-```
-docker compose run --rm --entrypoint python3 pi \
-  /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py sources --check
-```
+## Installation
 
-**Préparer l'arborescence et démarrer Ollama + Open WebUI**  
-```
-docker compose up -d
-```
+1. **GPU dans Docker** ([NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)) :
+   ```
+   curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+     && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+       sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+       sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+   sudo apt-get update && sudo apt-get -y install nvidia-container-toolkit
+   sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+   docker run --rm --gpus all --entrypoint "" ollama/ollama nvidia-smi
+   ```
+2. **Clés API** (facultatives) : voir [secrets/README.md](secrets/README.md). La clé OpenAlex est fortement recommandée.
+3. **Services et modèles** :
+   ```
+   docker compose up -d
+   docker exec ollama ollama pull qwen3:4b      # modèle par défaut ; autres choix dans pi/config/models.json
+   docker compose build pi
+   ```
 
-**Télécharger les modèles optimisés pour vos 4 Go de VRAM**  
-```
-docker exec -it ollama ollama pull qwen3:4b
-docker exec -it ollama ollama pull gemma4:e2b
-docker exec -it ollama ollama pull phi4-mini
-docker exec -it ollama ollama pull ministral-3:3b
-```
+## Utilisation
 
-**Construire l'image de Pi et lancer une session interactive**  
 ```
-docker compose build pi
-docker compose run --rm pi --model ollama/qwen3:4b
-# OU
 ./start-pi.sh -p "Constitue une sélection de publications sur les méthodes pour enseigner l'informatique"
 ```
 
-Vérifier que le modèle tourne entièrement sur le GPU pendant une réponse (colonne PROCESSOR = `100% GPU`) :
-```
-docker exec ollama ollama ps
-```
+Pi lance une seule commande (`search_manager.py review`, voir [SKILL.md](pi/config/skills/literature-review/SKILL.md)). Elle :
+1. interroge les bases en français et en anglais ;
+2. fusionne les doublons ;
+3. complète citations et PDF légaux via OpenAlex ;
+4. note chaque résumé de 0 à 3 avec le LLM ;
+5. télécharge les PDF retenus et écrit dans `workspace/<thème>/` :
 
-**Résultat d'une sélection** (`workspace/<thème>/`)  
-- `SELECTION.md` : tableau classé par pertinence (0-3, notée par le LLM), puis percentile de citations (OpenAlex, corrigé de l'âge et du domaine), puis citations brutes. `?` = inconnu (fréquent pour HAL sans DOI), pas zéro.
-- `selection.ris` : à importer dans Zotero (Fichier > Importer) ; les PDF téléchargés sont joints. Pour les publications avec DOI, la baguette magique de Zotero (« Ajouter un document par son identifiant ») récupère aussi des métadonnées complètes.
-- `pdfs/` : PDF en accès libre des publications retenues. HAL protège ses fichiers par une page anti-robot : ces PDF-là sont à télécharger à la main (colonne PDF = `[lien]` dans `SELECTION.md`).
-- `metadata.json` : toutes les notices, y compris celles écartées.
+| Fichier | Contenu |
+|---|---|
+| `SELECTION.md` | tableau classé : pertinence, puis percentile de citations (corrigé de l'âge et du domaine), puis citations. `?` = inconnu, pas zéro |
+| `selection.ris` | à importer dans Zotero (Fichier > Importer), PDF joints |
+| `pdfs/` | PDF en accès libre. Les liens HAL sont bloqués par une page anti-robot : télécharger à la main (`[lien]` dans le tableau) |
+| `metadata.json` | toutes les notices, y compris celles écartées |
 
-Commandes séparées si besoin : `search_manager.py search|rank|download|export --dir ...` (`--help`).  
-Test hors ligne : `python3 pi/config/skills/literature-review/scripts/test_search_manager.py`
+Vérifications :
+- Pendant une réponse, `docker exec ollama ollama ps` doit afficher `100% GPU`.
+- Test hors ligne : `python3 pi/config/skills/literature-review/scripts/test_search_manager.py`.
 
-**Accéder à Open WebUI**  
-<http://localhost:3000>  
+## Interroger les PDF dans Open WebUI (<http://localhost:3000>)
 
-**Interroger les publications dans Open WebUI**  
-1. Espace de travail > Connaissances > nouvelle collection (une par thème).
-2. Y téléverser le dossier `workspace/<thème>/pdfs/` et `SELECTION.md` (pour que l'agent connaisse auteurs, années et citations).
-3. Dans une discussion, taper `#` puis choisir la collection (ou créer un Modèle avec la collection attachée). Les réponses citent les passages et les fichiers utilisés : toujours vérifier le passage cité.
+1. Espace de travail > Connaissances : une collection par thème, y téléverser `pdfs/` et `SELECTION.md`.
+2. Dans une discussion, `#` puis la collection. Les réponses citent leurs passages : les vérifier.
 
-Limites : les PDF scannés (vieux documents) n'ont pas de texte et restent vides sans OCR ; un modèle 4B répond bien sur un passage précis, mal sur « compare tous les articles ».
+Limites :
+- Les PDF scannés n'ont pas de texte : ils restent vides sans OCR.
+- Un modèle 4B répond bien sur un passage précis, mal sur « compare tous les articles ».
 
+## Organisation du code (`pi/config/skills/literature-review/scripts/`)
+
+| Fichier | Rôle |
+|---|---|
+| `search_manager.py` | ligne de commande : `review`, `search`, `rank`, `download`, `export`, `sources` |
+| `search.py` | étape 1 : bases -> notices, doublons, complément OpenAlex |
+| `rank.py` | étape 2 : note de pertinence par le LLM, classement |
+| `pdf.py` | étape 3 : téléchargement des PDF |
+| `export.py` | étape 4 : `selection.ris` et `SELECTION.md` |
+| `records.py` | format commun d'une notice, fusion des doublons |
+| `net.py` | session HTTP (délai, nouvelles tentatives), lecture des clés |
+| `providers/` | un module par base + registre `__init__.py` |
+
+Ajouter une base : écrire `providers/<base>.py` avec `search(query, max_results, lang)` qui renvoie des `make_record(...)`, puis l'inscrire dans `providers/__init__.py`.
+
+Historique et raisons des choix : [CHANGEMENTS.md](CHANGEMENTS.md).

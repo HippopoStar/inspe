@@ -1,134 +1,93 @@
 # Changements de la branche `feat/selection-zotero`
 
-Objectif retenu :
-- **Pi** constitue une sélection de publications sur un thème, classée par pertinence et par nombre de citations, exportable dans Zotero.
-- **Open WebUI** permet de parcourir ces publications et d'interroger un agent sur leur contenu.
-- Le tout sans perdre de temps sur du travail inutile, sur un HP Victus (Ryzen 5 5600H, RTX 3050 Mobile 4 Go, 16 Go de RAM).
+**Objectif.** Pi constitue une sélection de publications sur un thème, classée par pertinence et par citations, exportable dans Zotero. Open WebUI interroge le contenu des PDF. Le tout sans temps perdu sur un HP Victus (Ryzen 5 5600H, RTX 3050 4 Go, 16 Go de RAM).
 
-## Ce qui n'allait pas (constaté dans le journal de session du 23/11)
+## Constats de départ (session du 23/11)
 
-| Problème | Effet mesuré |
+| Problème | Effet |
 |---|---|
-| qwen3:4b en mode « réflexion » | ~6 000 tokens de réflexion pour une commande et une liste : 8 min 30 pour une recherche qui prend 2,4 s |
-| ~12-13 tokens/s | trop lent pour un 4B sur RTX 3050 (≈ 40 attendu) : le modèle débordait probablement sur le CPU (contexte 16k) |
-| Le LLM lisait tout `metadata.json` pour le reformater | un tour complet (~4 min) ; et il n'a affiché que 5 articles sur 15, dans l'ordre du fichier |
-| La phrase de l'utilisateur envoyée telle quelle comme requête, en français seulement | environ la moitié des 15 résultats hors sujet |
-| Aucune note de pertinence, aucun nombre de citations | impossible de classer |
-| Notices incomplètes pour Zotero (pas de type, revue, volume, pages ; auteurs coupés à 5 ; résumé coupé à 700 caractères) | export Zotero impossible proprement |
-| Les PDF étaient téléchargés mais jamais lus (pypdf installé, inutilisé) | la « synthèse » se basait sur des bouts de résumés |
-| OpenAlex exige une clé API depuis le 13/02/2026 | quota fortement réduit sans clé |
-| Liens « PDF » qui n'en sont pas (`oa_url` d'OpenAlex = page d'accueil ou doi.org ; `url` d'ERIC = page éditeur) | mauvais choix des articles « avec PDF » |
-| Open WebUI : le dossier `workspace` monté n'est pas indexé ; modèle d'embedding par défaut anglais seulement | recherche dans les PDF français médiocre |
+| qwen3:4b en mode réflexion | ~6 000 tokens de réflexion : 8 min 30 pour une recherche de 2,4 s |
+| ~12 tokens/s au lieu de ~40 | contexte 16k : le modèle débordait probablement sur le CPU |
+| le LLM relisait tout `metadata.json` | un tour de ~4 min, et seulement 5 articles affichés sur 15 |
+| phrase de l'utilisateur envoyée telle quelle, en français seulement | ~la moitié des résultats hors sujet |
+| ni pertinence ni citations ; notices tronquées | ni classement ni export Zotero possibles |
+| PDF téléchargés mais jamais lus | « synthèse » faite sur des bouts de résumés |
 
-## Les changements, fichier par fichier
+## Choix et raisons
 
-### `compose.yml`
-- `OLLAMA_CONTEXT_LENGTH=8192` et `OLLAMA_KV_CACHE_TYPE=q8_0` (au lieu de 16384 / q4_0).
-  **Pourquoi** : 16k + q4_0 ne tenait pas entièrement dans 4 Go et q4_0 dégrade la qualité. 8k + q8_0 ≈ 3,1 Go pour qwen3:4b.
-  **À vérifier** : `docker exec ollama ollama ps` pendant une réponse doit afficher `100% GPU`.
-- Open WebUI : `RAG_EMBEDDING_MODEL=BAAI/bge-m3`.
-  **Pourquoi** : le défaut (`all-MiniLM-L6-v2`) ne comprend que l'anglais. bge-m3 est multilingue et tourne sur CPU (la VRAM reste au LLM). Réindexer après le changement.
-- Service `pi` : `OLLAMA_HOST` et `RANK_MODEL`. L'ancienne variable `OLLAMA_BASE_URL` n'était utilisée par rien. Les clés API passent par `./secrets` (voir « Ajout : bases de données » plus bas).
+**Rapidité**
+- Réflexion désactivée : `"reasoning": false` et `/no_think` dans `AGENTS.md`.
+- Contexte 8k avec cache KV `q8_0`, pour que le modèle tienne entièrement en VRAM.
+- Le modèle de code qwen2.5-coder est retiré.
 
-### `pi/config/models.json` et `pi/config/AGENTS.md`
-- qwen3:4b passe en `"reasoning": false` et `/no_think` est ajouté en tête de `AGENTS.md` (interrupteur reconnu par Qwen3).
-  **Pourquoi** : la réflexion représentait ~90 % du temps de la session.
-- `qwen2.5-coder:3b` retiré : modèle de code, faible en synthèse française.
-- `contextWindow` à 8192 pour rester cohérent avec Ollama.
-
-### `pi/Dockerfile`
-- Seul `requests` reste installé. `arxiv`, `beautifulsoup4` et `pypdf` n'étaient utilisés par aucun script. La lecture des PDF est faite par Open WebUI.
-
-### `start-pi.sh`
-- Le bouton Annuler du menu fonctionne.
-  **Pourquoi** : avec `set -e`, le script s'arrêtait avant d'atteindre le test `if [ $? -ne 0 ]`.
-
-### `scripts/utils.py` et `scripts/providers/*.py`
-- Chaque notice contient maintenant :
-  - les champs Zotero : `type` (code RIS : JOUR, THES, CHAP, BOOK, CONF, RPRT, GEN), `container` (revue/livre), `volume`, `issue`, `pages`, `language`, `url` ;
-  - `cited_by` (nombre de citations) et `citation_percentile` ;
-  - la liste complète des auteurs et le résumé complet.
-- OpenAlex et Semantic Scholar lisent leur clé API dans l'environnement.
-- `pdf_url` ne contient plus que de vrais liens PDF : fallback `oa_url` supprimé côté OpenAlex, `url` d'ERIC déplacée dans `url`.
-
-### `scripts/search_manager.py` (le cœur du changement)
-Une commande `review` fait tout, pour que Pi n'ait qu'**un seul appel d'outil** à faire :
-1. **Recherche** : plusieurs requêtes (FR + EN) sur les bases choisies.
-2. **Fusion des doublons** par DOI *ou* titre ; les champs manquants sont complétés par l'autre notice (avant, l'abstract pouvait être perdu).
-3. **Citations** : pour toute notice avec DOI, OpenAlex fournit le nombre de citations et le *percentile normalisé* (corrigé de l'âge et du domaine).
-   **Pourquoi une seule source** : les chiffres de bases différentes ne sont pas comparables.
-4. **Pertinence** : chaque titre + résumé est noté de 0 à 3 par le LLM. Le script appelle directement l'API native d'Ollama (`think: false`, réponse JSON imposée), une note courte par article, sans boucle d'agent.
-5. **Classement** : pertinence, puis percentile, puis citations brutes. Une valeur inconnue passe après les valeurs connues, mais s'affiche `?` et non 0 : les publications HAL sans DOI n'ont souvent aucune donnée de citation.
-6. **PDF** des publications retenues (pertinence ≥ 2 par défaut).
-7. **Export** :
-   - `selection.ris`, à importer dans Zotero (Fichier > Importer). Les PDF téléchargés sont joints via `L1`, et la note contient pertinence et citations.
-   - `SELECTION.md`, le tableau complet, que Pi recopie tel quel.
-
-Les étapes restent disponibles séparément : `search`, `rank`, `download`, `export` (`--help`).
-
-### `skills/literature-review/SKILL.md`
-- Réécrit pour que le LLM ne fasse que ce qui demande du jugement :
-  - transformer le sujet en 3 à 5 requêtes de mots-clés FR + EN ;
+**Un seul appel d'outil**
+- `search_manager.py review` fait tout. Le LLM ne fait que ce qui demande du jugement :
+  - écrire les requêtes ;
   - choisir les bases ;
-  - lancer `review` ;
-  - recopier le tableau.
-- Interdiction explicite de lire `metadata.json` ou d'écrire des scripts.
+  - noter la pertinence, via un appel direct et court à Ollama sans boucle d'agent.
 
-### `scripts/test_search_manager.py` (nouveau)
-- Test hors ligne : fusion des doublons, lecture des notes, ordre de classement, contenu du RIS et du tableau. Lancer : `python3 test_search_manager.py`.
+**Français et anglais**
+- `review` exige `--fr` et `--en` et n'a pas de filtre de langue.
+- La consigne de notation ignore la langue.
+- L'agent n'a donc rien à arbitrer.
 
-### `README.md` et `.gitignore`
-- Clés API dans `secrets/` (ignoré par git), vérification GPU, description des fichiers produits, marche à suivre pour charger les PDF dans une collection Open WebUI.
+**Classement**
+- Ordre : pertinence 0-3, puis percentile de citations OpenAlex (corrigé de l'âge et du domaine), puis citations brutes.
+- Les citations viennent toutes d'OpenAlex : des chiffres de bases différentes ne sont pas comparables.
 
-## Ajout : bases de données demandées
+**Zotero**
+- Chaque notice a son type, sa revue, son volume, son numéro, ses pages, sa langue, tous ses auteurs et son résumé complet.
+- Export `.ris` avec PDF joints.
 
-Règle appliquée : les bases sans clé sont intégrées d'office ; celles qui demandent une clé sont facultatives (fichier dans `secrets/`) ; une commande liste explicitement les bases accessibles selon les clés fournies.
+**Open WebUI**
+- Embeddings multilingues (`BAAI/bge-m3`) : le modèle par défaut ne gère que l'anglais.
+- Le montage `workspace` dans Open WebUI est supprimé : il n'était pas indexé. Les PDF se chargent dans une collection.
 
-| Base demandée | Statut | Comment |
+**Docker**
+- Les clés API sont des `secrets`, avec un fichier vide quand il n'y a pas de clé.
+- `AGENTS.md` et `models.json` sont des `configs`.
+- Les skills restent un montage en lecture seule : `configs` ne prend pas de dossiers.
+- `workspace/` et `pi/config/sessions/` sont ignorés par git.
+
+**Code**
+- Une étape par module : `search`, `rank`, `pdf`, `export`.
+- Format de notice commun (`records.py`) et accès réseau partagé (`net.py`).
+- Un module par base, plus un registre.
+- Test hors ligne (`test_search_manager.py`).
+
+**Corrections**
+- Bouton Annuler de `start-pi.sh`.
+- Seuls de vrais liens PDF sont gardés.
+- Dépendances Python inutilisées retirées.
+
+## Bases de données
+
+| Base | Statut | Remarque |
 |---|---|---|
-| HAL, DUMAS, TEL | intégrées, sans clé | API HAL ; DUMAS et TEL sont des portails HAL (`/search/dumas/`, `/search/tel/`) |
-| OpenAlex | intégrée, clé recommandée | sans clé : quota très réduit (une erreur 525 observée lors du test) |
-| Crossref, ERIC | intégrées, sans clé | déjà présentes |
-| Cairn, Persée, OpenEdition, JSTOR, Taylor & Francis | intégrées, sans clé, **via Crossref** | aucune n'a d'API de recherche publique ; on interroge Crossref filtré sur leur préfixe DOI (10.3917, 10.3406, 10.4000, 10.2307, 10.1080). Métadonnées seulement, textes souvent payants |
-| CORE | intégrée, clé facultative | sans clé : quota bas, service parfois saturé |
-| Semantic Scholar | intégrée, clé facultative | sans clé : erreurs 429 fréquentes |
-| Springer Nature | facultative, clé obligatoire | Meta API v2 |
-| Scopus | facultative, clé obligatoire | résultats complets seulement depuis le réseau d'un établissement abonné ou avec `scopus_insttoken` |
-| Web of Science | facultative, clé obligatoire | API Starter, sans résumés (la note de pertinence se fait alors sur le titre seul) |
-| Google Scholar | **non intégrée** | aucune API ; le site bloque les robots (CAPTCHA) et l'interdit dans ses conditions |
-| Pascal et Francis | **non intégrée** | base INIST figée (1972-2015), sans API de recherche publique |
-| EBSCO | **non intégrée** | API EDS réservée aux établissements abonnés (compte activé par EBSCO) ; ajoutable si l'université fournit un accès API |
-| Sci-Hub | **exclue** | diffuse des articles en violation du droit d'auteur, bloqué en France par décision de justice |
-| DOAJ | conservée | déjà présente, sans clé |
+| HAL, TEL, DUMAS | sans clé | TEL et DUMAS sont des portails HAL |
+| Crossref, ERIC, DOAJ | sans clé | |
+| Cairn, Persée, OpenEdition, JSTOR, Taylor & Francis | sans clé, via Crossref | pas d'API publique : Crossref filtré sur leur préfixe DOI ; métadonnées seulement |
+| OpenAlex | clé recommandée | sans clé, quota très réduit ; source des citations et des PDF légaux (Unpaywall) |
+| Semantic Scholar, CORE | clé facultative | sans clé : 429 / service saturé |
+| Springer Nature, Scopus, Web of Science | clé obligatoire | écrits d'après la documentation, **non testés** : vérifier avec `sources --check` |
+| Google Scholar | non intégrée | pas d'API, bloque les robots, l'interdit dans ses conditions |
+| Pascal et Francis | non intégrée | archive figée (1972-2015) sans API |
+| EBSCO | non intégrée | API réservée aux établissements abonnés |
+| Sci-Hub, Open-Slum | exclues | violation du droit d'auteur ; Open-Slum ne fait que surveiller ces sites. Remplacées par les PDF légaux d'OpenAlex/Unpaywall |
 
-- **Clés en « docker secrets »** : le dossier `./secrets` est monté en lecture seule sur `/run/secrets`, l'emplacement standard des docker secrets, avec un fichier par clé (liste dans `secrets/README.md`). Le script lit `/run/secrets/<nom>`, sinon la variable d'environnement `<NOM>`.
-  **Pourquoi un dossier plutôt que la section `secrets:` de compose** : compose exige que chaque fichier déclaré existe, ce qui rendrait chaque clé obligatoire.
-- **`search_manager.py sources [--check]`** : tableau de chaque base (`ok` / `limité` / `clé manquante`), avec la clé attendue, les bases non intégrées et leur raison. `--check` fait une vraie requête par base pour vérifier que la clé fonctionne.
-- **`--sources all`** : toutes les bases accessibles avec les clés présentes. Une base dont la clé obligatoire manque est ignorée avec un message, sans faire échouer la recherche.
-- **Non testé** : Springer, Scopus et Web of Science (écrits d'après leur documentation, faute de clé). Les vérifier avec `sources --check` une fois les clés ajoutées.
+## Tests réels (sans clé, sans Ollama)
 
-## Ajout : français et anglais sans hésitation
-
-Le modèle ne doit pas perdre de temps à choisir une langue : les deux conviennent toujours.
-- `review` exige `--fr` **et** `--en` (au moins une requête chacun) et n'a plus d'option `--lang`. L'agent n'a donc aucun choix à faire.
-- La consigne de notation précise que la langue du document ne compte pas.
-- `AGENTS.md` et `SKILL.md` le disent explicitement.
-- L'option `--lang` reste disponible pour la commande `search` lancée à la main.
-
-## Résultats du test réel (23/11, sans clé API, sans Ollama)
-
-- Recherche sur les 6 bases, 2 requêtes : 48 notices uniques, 6 doublons fusionnés. Champs Zotero bien remplis pour HAL, OpenAlex, Crossref et DOAJ ; ERIC sans volume ni pages.
-- Le `.ris` produit est complet (type, auteurs « Nom, Prénom », revue, volume, numéro, pages, DOI, résumé).
-- **Semantic Scholar** renvoie des erreurs 429 sans clé : demander une clé gratuite.
-- **HAL** protège maintenant ses fichiers par une page anti-robot : le script ne peut pas télécharger ces PDF. Il l'indique (`BLOQUÉ (anti-robot)`) et `SELECTION.md` donne le lien pour les télécharger à la main.
-- Les liens « fulltext » de DOAJ sont souvent des pages HTML : rejetés automatiquement.
-- Le percentile OpenAlex vaut parfois 0 % pour de vieux articles pourtant cités (ex. 1990, 18 citations) : regarder aussi la colonne Citations.
-- **Non testé** : la notation par le LLM (Ollama n'était pas lancé) et l'import réel dans Zotero.
+- **Recherche :** 14 bases répondent. 54 notices uniques sur 8 bases ; OpenAlex en a complété 26 (citations ou PDF légal).
+- **Échecs sans clé :** OpenAlex (erreur 525), Semantic Scholar (429), CORE (saturé).
+- **HAL :** ses PDF sont derrière une page anti-robot ; le script le signale et donne le lien.
+- **Non testé ici :**
+  - la notation par le LLM ;
+  - l'import Zotero ;
+  - compose avec les `secrets` (Docker n'était pas démarré, seul `docker compose config` a été validé).
 
 ## Limites connues
 
-- Noms de famille composés sans virgule (« Djeumeni Tchamabe ») mal coupés dans le RIS : à corriger dans Zotero.
-- L'année HAL peut être la date de dépôt et non de première publication.
-- Les PDF scannés n'ont pas de texte : vides dans Open WebUI sans OCR.
-- Un modèle 4B répond bien sur un passage précis, mal sur « compare tous les articles ».
-- Avec 16 Go de RAM (dont ~7 déjà utilisés), pas de place pour un modèle plus gros réparti GPU/CPU.
+- Noms de famille composés mal coupés dans le `.ris` : à corriger dans Zotero.
+- Année HAL parfois égale à la date de dépôt.
+- PDF scannés sans OCR.
+- 16 Go de RAM : pas de place pour un modèle plus gros.

@@ -1,25 +1,26 @@
-# Clés API (facultatives)
+# Clés API (docker secrets, toutes facultatives)
 
-Un fichier par clé, contenant seulement la clé, nommé exactement comme ci-dessous. Ce dossier est
-ignoré par git (sauf ce README) et monté en lecture seule dans `/run/secrets` du conteneur `pi`.
+Un fichier par clé, nommé comme ci-dessous, contenant seulement la clé. Les fichiers sont déclarés comme
+`secrets` dans `compose.yml` et lus dans `/run/secrets/<nom>`. Ce dossier est ignoré par git, sauf ce README.
 
-| Fichier | Base | Sans ce fichier | Obtenir la clé (gratuite) |
+`./start-pi.sh` crée les fichiers manquants, vides. Un fichier vide signifie « pas de clé ». Sans passer par
+ce script : `docker compose config --format json | jq -r '.secrets[].file' | xargs touch`.
+
+| Fichier | Base | Sans clé | Obtenir la clé (gratuite) |
 |---|---|---|---|
-| `openalex_api_key` | OpenAlex (+ citations de toutes les bases) | quota très réduit, erreurs possibles | https://openalex.org/settings/api |
+| `openalex_api_key` | OpenAlex, et citations + PDF légaux pour toutes les bases | quota très réduit | https://openalex.org/settings/api |
 | `s2_api_key` | Semantic Scholar | erreurs 429 fréquentes | https://www.semanticscholar.org/product/api#api-key-form |
-| `core_api_key` | CORE | quota bas | https://core.ac.uk/services/api |
-| `springer_api_key` | Springer Nature | base désactivée | https://dev.springernature.com |
-| `scopus_api_key` | Scopus | base désactivée | https://dev.elsevier.com |
-| `scopus_insttoken` | Scopus (accès complet hors campus) | résultats partiels hors réseau de l'établissement | à demander à la bibliothèque |
-| `wos_api_key` | Web of Science (Starter) | base désactivée | https://developer.clarivate.com |
+| `core_api_key` | CORE | quota bas, souvent saturé | https://core.ac.uk/services/api |
+| `springer_api_key` | Springer Nature | désactivée | https://dev.springernature.com |
+| `scopus_api_key` | Scopus | désactivée | https://dev.elsevier.com |
+| `scopus_insttoken` | Scopus hors campus | résultats partiels hors réseau de l'établissement | bibliothèque universitaire |
+| `wos_api_key` | Web of Science | désactivée | https://developer.clarivate.com |
 
-Exemple :
 ```
 echo -n "ma_cle" > secrets/openalex_api_key
-chmod 644 secrets/openalex_api_key   # lisible par l'utilisateur du conteneur (UID 1000)
 ```
 
-Vérifier les bases accessibles avec les clés fournies :
+Bases accessibles avec les clés fournies, une vraie requête de test par base :
 ```
 docker compose run --rm --entrypoint python3 pi \
   /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py sources --check

@@ -1,20 +1,23 @@
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
 services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
     restart: unless-stopped
-    expose:
-      - "11434"
+    expose: ["11434"]
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      # Optimisations strictes pour 4 Go de VRAM (RTX 3050)
+      # Réglé pour 4 Go de VRAM (RTX 3050) : un seul modèle, une requête à la fois.
       - OLLAMA_MAX_LOADED_MODELS=1
       - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_KEEP_ALIVE=5m
       - OLLAMA_FLASH_ATTENTION=1
-      # Contexte de 8k tokens + cache KV q8_0 : un modèle 4B tient entièrement dans les 4 Go de VRAM
-      # (16k + q4_0 débordait sur le CPU et dégradait la qualité). Vérifier avec : docker exec ollama ollama ps
+      # 8k tokens + cache KV q8_0 : un modèle 4B tient entièrement en VRAM.
+      # Vérifier pendant une réponse : docker exec ollama ollama ps  ->  100% GPU
       - OLLAMA_CONTEXT_LENGTH=8192
       - OLLAMA_KV_CACHE_TYPE=q8_0
     healthcheck:
@@ -26,54 +29,35 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - ai-net
+            - { driver: nvidia, count: 1, capabilities: [gpu] }
+    logging: *logging
+    networks: [ai-net]
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open-webui
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3000:8080"
+    ports: ["127.0.0.1:3000:8080"]
     volumes:
       - open_webui_data:/app/backend/data
-      - ./workspace:/app/backend/data/workspace_shared:ro
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
-      # Force l'embedding RAG sur CPU pour préserver les 4 Go de VRAM pour le LLM
-      - RAG_EMBEDDING_ENGINE=
-      # Modèle d'embedding multilingue (le défaut all-MiniLM-L6-v2 ne gère que l'anglais).
-      # Après un changement : Admin > Paramètres > Documents > réindexer.
-      - RAG_EMBEDDING_MODEL=BAAI/bge-m3
-      - USE_CUDA_DOCKER=false
       - ENABLE_OLLAMA_API=true
       - ENABLE_OPENAI_API=false
       - WEBUI_AUTH=false
-    security_opt:
-      - no-new-privileges:true
+      # Embeddings sur CPU (la VRAM reste au LLM), modèle multilingue : le défaut ne gère que l'anglais.
+      # Après un changement de modèle : Admin > Paramètres > Documents > réindexer.
+      - RAG_EMBEDDING_ENGINE=
+      - RAG_EMBEDDING_MODEL=BAAI/bge-m3
+      - USE_CUDA_DOCKER=false
+    security_opt: ["no-new-privileges:true"]
     depends_on:
-      ollama:
-        condition: service_healthy
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - ai-net
+      ollama: { condition: service_healthy }
+    logging: *logging
+    networks: [ai-net]
 
   pi:
-    build:
-      context: ./pi
-      dockerfile: Dockerfile
+    build: ./pi
     image: local-pi-agent:latest
     user: "1000:1000"
     profiles: ["cli"]
@@ -82,26 +66,41 @@ services:
     working_dir: /workspace
     volumes:
       - ./workspace:/workspace
-      # Protège les instructions et scripts contre toute modification accidentelle par le LLM
-      - ./pi/config/AGENTS.md:/home/node/.pi/agent/AGENTS.md:ro
-      - ./pi/config/models.json:/home/node/.pi/agent/models.json:ro
-      - ./pi/config/skills:/home/node/.pi/agent/skills:ro
+      - ./pi/config/skills:/home/node/.pi/agent/skills:ro   # lecture seule : le LLM ne peut pas modifier ses scripts
       - ./pi/config/sessions:/home/node/.pi/agent/sessions
-      # Clés API : un fichier par clé dans ./secrets (ex. secrets/openalex_api_key), lu dans /run/secrets
-      # comme des docker secrets. Monté en dossier plutôt qu'en `secrets:` car compose exige que chaque
-      # fichier déclaré existe ; ici chaque clé reste facultative. Voir : search_manager.py sources --check
-      - ./secrets:/run/secrets:ro
+    configs:
+      - { source: pi_agents, target: /home/node/.pi/agent/AGENTS.md }
+      - { source: pi_models, target: /home/node/.pi/agent/models.json }
+    # Lues dans /run/secrets/<nom>. Fichier vide = pas de clé (base limitée ou désactivée) :
+    # ./start-pi.sh crée les fichiers manquants. Bilan : search_manager.py sources --check
+    secrets:
+      - openalex_api_key
+      - s2_api_key
+      - core_api_key
+      - springer_api_key
+      - scopus_api_key
+      - scopus_insttoken
+      - wos_api_key
     environment:
-      # Utilisé par search_manager.py rank (API native Ollama, sans « réflexion »)
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=http://ollama:11434        # notation de pertinence (API native Ollama)
       - RANK_MODEL=${RANK_MODEL:-qwen3:4b}
-    security_opt:
-      - no-new-privileges:true
+    security_opt: ["no-new-privileges:true"]
     depends_on:
-      ollama:
-        condition: service_healthy
-    networks:
-      - ai-net
+      ollama: { condition: service_healthy }
+    networks: [ai-net]
+
+configs:
+  pi_agents: { file: ./pi/config/AGENTS.md }
+  pi_models: { file: ./pi/config/models.json }
+
+secrets:
+  openalex_api_key: { file: ./secrets/openalex_api_key }
+  s2_api_key: { file: ./secrets/s2_api_key }
+  core_api_key: { file: ./secrets/core_api_key }
+  springer_api_key: { file: ./secrets/springer_api_key }
+  scopus_api_key: { file: ./secrets/scopus_api_key }
+  scopus_insttoken: { file: ./secrets/scopus_insttoken }
+  wos_api_key: { file: ./secrets/wos_api_key }
 
 volumes:
   ollama_data:
@@ -109,5 +108,3 @@ volumes:
 
 networks:
   ai-net:
-    driver: bridge
-
