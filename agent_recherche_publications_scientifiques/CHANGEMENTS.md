@@ -22,7 +22,7 @@
 
 **Un seul appel d'outil**
 - `search_manager.py review` fait tout. Le LLM ne fait que ce qui demande du jugement :
-  - écrire les requêtes ;
+  - écrire les requêtes et le concept central (`--core`) ;
   - choisir les bases ;
   - noter la pertinence, via un appel direct et court à Ollama sans boucle d'agent.
 
@@ -34,7 +34,8 @@
 - Barème de notation strict (le concept central doit être étudié, au moindre doute la note basse) : au premier essai, 179 notices sur 302 avaient reçu 2, dont un article sur les poèmes d'Ossian.
 
 **Classement**
-- Score = pertinence 0-3 + 2 × percentile de citations OpenAlex (corrigé de l'âge et du domaine), puis citations brutes à égalité. Au début, les citations ne départageaient que les notices de même note : une notice « pertinent » très citée ne passait jamais devant une « au cœur du sujet » jamais citée. Le poids se règle avec `--citation-weight` (0 = pertinence seule).
+- Score = pertinence 0-3 + poids × percentile de citations OpenAlex (corrigé de l'âge et du domaine), puis citations brutes à égalité. Poids 1 par défaut (`--citation-weight`) : une notice notée 2 ne passe jamais devant une notée 3. Un poids 2, rejoué sur le 2e essai, évinçait 13 des 15 notices notées 3 : sans DOI (ERIC) ou trop récentes, elles n'avaient pas de percentile, et non des citations faibles.
+- Les classiques sont recherchés à part (`--core`) : pour le concept central et ses synonymes, les travaux les plus cités qui le portent dans leur titre. Au 2e essai, les requêtes précises avaient manqué Boud 1999, O'Donnell, Topping et Riese, trouvés au 1er essai par la requête « peer learning ». Le titre est exigé : trier la recherche plein texte d'OpenAlex par citations ramène PRISMA ou NumPy.
 - Les citations ne font jamais entrer une notice sous `--min-relevance` : le filtre de pertinence passe avant le classement.
 - Les citations viennent toutes d'OpenAlex : des chiffres de bases différentes ne sont pas comparables.
 - Une notice sans résumé est notée 2 au plus : sur le titre seul, le modèle donnait 3 à des textes hors sujet.

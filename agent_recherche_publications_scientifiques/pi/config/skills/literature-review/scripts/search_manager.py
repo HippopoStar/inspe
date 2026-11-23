@@ -39,7 +39,7 @@ def cmd_review(a):
     a.dir = dated(a.dir)
     # Requêtes FR et EN obligatoires, sans filtre de langue : les deux langues conviennent toujours.
     queries = a.fr + a.en
-    records = rank.rank(search.search(queries, a.sources, a.max_results), a.topic or " / ".join(queries),
+    records = rank.rank(search.search(queries, a.sources, a.max_results, core=a.core), a.topic or " / ".join(queries),
                         rank.ollama_scorer(a.model), a.citation_weight)
     save(a.dir, records)
     keep = rank.selected(records, a.min_relevance, a.top)
@@ -111,6 +111,8 @@ def build_parser():
     p = command("review", cmd_review, "search + rank + export")
     p.add_argument("--fr", nargs="+", required=True, help="requêtes en français")
     p.add_argument("--en", nargs="+", required=True, help="requêtes en anglais")
+    p.add_argument("--core", nargs="+", required=True,
+                   help="concept central et synonymes, 1 à 3 mots chacun, FR et EN : leurs travaux les plus cités sont ajoutés")
     search_options(p)
     rank_options(p, False)
     selection_option(p)

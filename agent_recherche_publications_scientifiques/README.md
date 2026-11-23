@@ -32,7 +32,7 @@ Tout tourne en local (Ollama), réglé pour un GPU de 4 Go (RTX 3050).
 ```
 
 Pi lance une seule commande (`search_manager.py review`, voir [SKILL.md](pi/config/skills/literature-review/SKILL.md)). Elle :
-1. interroge les bases en français et en anglais ;
+1. interroge les bases en français et en anglais, et ajoute les travaux les plus cités portant le concept central (`--core`) dans leur titre ;
 2. fusionne les doublons ;
 3. complète citations et PDF légaux via OpenAlex ;
 4. note chaque résumé de 0 à 3 avec le LLM ;
@@ -41,11 +41,11 @@ Pi lance une seule commande (`search_manager.py review`, voir [SKILL.md](pi/conf
 
 | Fichier | Contenu |
 |---|---|
-| `SELECTION.md` | tableau classé par score = pertinence (0-3) + 2 × percentile de citations (corrigé de l'âge et du domaine), puis citations. `?` = inconnu, pas zéro. Colonne PDF : `[lien]` vers le PDF en accès libre |
+| `SELECTION.md` | tableau classé par score = pertinence (0-3) + percentile de citations (0-1) (corrigé de l'âge et du domaine), puis citations. `?` = inconnu, pas zéro. Colonne PDF : `[lien]` vers le PDF en accès libre |
 | `selection.ris` | à importer dans Zotero (Fichier > Importer) ; le lien PDF est dans la note de chaque notice |
 | `metadata.json` | toutes les notices, y compris celles écartées |
 
-Le poids des citations se règle avec `--citation-weight` (2 par défaut ; 0 = pertinence seule). Il ne fait jamais entrer une notice sous `--min-relevance`.
+Le poids des citations se règle avec `--citation-weight` (1 par défaut : une notice notée 2 ne passe jamais devant une notée 3 ; au-delà, une 2 très citée le peut ; 0 = pertinence seule). Il ne fait jamais entrer une notice sous `--min-relevance`.
 
 Vérifications :
 - Pendant une réponse, `docker exec ollama ollama ps` doit afficher `100% GPU`.

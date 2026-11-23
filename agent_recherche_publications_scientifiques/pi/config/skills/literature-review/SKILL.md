@@ -17,6 +17,8 @@ description: Builds a selection of scientific publications on a topic (HAL, TEL,
 - `--en`: the same ideas in English, 2 or 3 queries.
 - **Every query must contain the topic's core concept.** A query made only of generic words ("études comparatives", "pedagogical process") brings back off-topic results.
 - **2 to 4 words per query.** HAL, TEL and DUMAS require every word: a long query returns nothing. Put context (level, method) in `--topic`, not in the queries.
+- `--core`: the core concept and its synonyms, 1 to 3 words each, in English and French, nothing else (no "comparative", "study", "effectiveness"). The most cited works with these words in their title are added: they bring the classics that precise queries miss.
+  Example: `--core "peer learning" "peer tutoring" "apprentissage entre pairs" "tutorat entre pairs"`
   Example for "études comparatives sur le peer learning":
   `--fr "apprentissage entre pairs" "apprentissage par les pairs comparaison" "tutorat entre pairs efficacité"`
   `--en "peer learning comparative study" "peer tutoring effectiveness" "peer instruction versus lecture"`
@@ -34,6 +36,7 @@ python3 /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py 
   --topic "<subject in one sentence>" \
   --fr "<requête 1>" "<requête 2>" \
   --en "<query 1>" "<query 2>" \
+  --core "<concept>" "<synonym>" "<concept FR>" \
   --sources <sources>
 ```
 
@@ -45,5 +48,5 @@ Answer in a few lines, in the user's language, with the folder path printed by t
 - `<printed folder>/selection.ris` is to be imported into Zotero (File > Import);
 - the `PDF` column of `SELECTION.md` links to open-access PDFs (`[lien]`); nothing was downloaded. To query a PDF in Open WebUI, the user downloads it and uploads it to a Knowledge collection.
 
-The selection keeps the 20 best results, ranked by relevance plus citations. If the user wants more or fewer, run again with `--top` (default 20) or `--min-relevance` (default 2); `--citation-weight` (default 2, 0 = relevance only) sets how much citations count.
+The selection keeps the 20 best results, ranked by relevance plus citations. If the user wants more or fewer, run again with `--top` (default 20) or `--min-relevance` (default 2); `--citation-weight` (default 1, 0 = relevance only) sets how much citations count.
 To see which databases are accessible: `search_manager.py sources --check`.

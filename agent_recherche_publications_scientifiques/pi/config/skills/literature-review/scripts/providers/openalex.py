@@ -30,25 +30,35 @@ def _pdf(work: dict) -> str:
     return (work.get("best_oa_location") or {}).get("pdf_url") or ""
 
 
+def _record(w: dict) -> dict:
+    loc, biblio = w.get("primary_location") or {}, w.get("biblio") or {}
+    return make_record(
+        "openalex", w.get("id", "").rsplit("/", 1)[-1], w.get("title"),
+        [a.get("author", {}).get("display_name", "") for a in w.get("authorships", [])],
+        w.get("publication_year"), _abstract(w.get("abstract_inverted_index")), _pdf(w), w.get("doi"),
+        item_type=TYPES.get(w.get("type"), "GEN"),
+        container=(loc.get("source") or {}).get("display_name", ""),
+        volume=biblio.get("volume"), issue=biblio.get("issue"),
+        pages="-".join(p for p in (biblio.get("first_page"), biblio.get("last_page")) if p),
+        language=w.get("language"), url=loc.get("landing_page_url") or "",
+        cited_by=w.get("cited_by_count"), citation_percentile=_percentile(w),
+    )
+
+
 def search(query: str, max_results: int, lang: str = None) -> list:
     params = {"search": query, "per-page": max_results}
     if lang:
         params["filter"] = f"language:{lang}"
-    results = []
-    for w in _get(**params):
-        loc, biblio = w.get("primary_location") or {}, w.get("biblio") or {}
-        results.append(make_record(
-            "openalex", w.get("id", "").rsplit("/", 1)[-1], w.get("title"),
-            [a.get("author", {}).get("display_name", "") for a in w.get("authorships", [])],
-            w.get("publication_year"), _abstract(w.get("abstract_inverted_index")), _pdf(w), w.get("doi"),
-            item_type=TYPES.get(w.get("type"), "GEN"),
-            container=(loc.get("source") or {}).get("display_name", ""),
-            volume=biblio.get("volume"), issue=biblio.get("issue"),
-            pages="-".join(p for p in (biblio.get("first_page"), biblio.get("last_page")) if p),
-            language=w.get("language"), url=loc.get("landing_page_url") or "",
-            cited_by=w.get("cited_by_count"), citation_percentile=_percentile(w),
-        ))
-    return results
+    return [_record(w) for w in _get(**params)]
+
+
+def most_cited(phrase: str, max_results: int) -> list:
+    """Les travaux les plus cités dont le titre contient l'expression exacte : les classiques du sujet.
+    Le titre est exigé : trier la recherche plein texte par citations ramène des articles sans rapport
+    (PRISMA, NumPy pour « peer learning »)."""
+    phrase = " ".join(phrase.replace('"', " ").replace(",", " ").replace("|", " ").split())
+    return [_record(w) for w in _get(filter=f'title.search:"{phrase}"', sort="cited_by_count:desc",
+                                     **{"per-page": max_results})]
 
 
 def lookup_dois(dois: list) -> dict:

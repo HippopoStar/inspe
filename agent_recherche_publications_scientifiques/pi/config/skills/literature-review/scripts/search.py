@@ -1,6 +1,6 @@
 """Étape 1 : interroger les bases, fusionner les doublons, compléter citations et PDF via OpenAlex."""
 from providers import SOURCES, available, status
-from providers.openalex import lookup_dois
+from providers.openalex import lookup_dois, most_cited
 from records import deduplicate
 
 
@@ -34,7 +34,7 @@ def complete_from_openalex(records: list):
     print(f"[openalex] {len(found)} notice(s) complétée(s) (citations, PDF en accès libre).")
 
 
-def search(queries: list, sources: list, max_results: int, lang: str = None) -> list:
+def search(queries: list, sources: list, max_results: int, lang: str = None, core: list = ()) -> list:
     raw = []
     for source in usable_sources(sources):
         for query in queries:
@@ -44,6 +44,15 @@ def search(queries: list, sources: list, max_results: int, lang: str = None) -> 
                 raw += found
             except Exception as e:
                 print(f"[{source}] erreur : {str(e)[:160]}")
+    # Les requêtes précises ne ramènent pas les classiques (2e essai : Boud 1999, Topping absents) :
+    # pour chaque concept central, les travaux les plus cités qui le portent dans leur titre.
+    for term in core:
+        try:
+            found = most_cited(term, max_results)
+            print(f"[openalex, plus cités] « {term} » : {len(found)}")
+            raw += found
+        except Exception as e:
+            print(f"[openalex, plus cités] erreur : {str(e)[:160]}")
     records = deduplicate(raw)
     print(f"{len(records)} notices uniques ({len(raw) - len(records)} doublon(s) fusionné(s)).")
     complete_from_openalex(records)

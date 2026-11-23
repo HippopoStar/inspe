@@ -48,13 +48,14 @@ def test_rank_order_and_selection():
     with contextlib.redirect_stdout(io.StringIO()) as out:
         ranked = rank.rank(records, "sujet", lambda topic, r: scores[r["title"]])
     assert out.getvalue().splitlines() == ["[rank] 5/5 notées", "[rank] notes : 3 = 2, 2 = 2, 1 = 0, 0 = 0"]
-    # Poids 2 par défaut : B (2 + 2 × 0,99) passe devant C (3 + 2 × 0,2) et A (3, jamais cité) ; sans résumé, E = 2.
-    assert [r["title"] for r in ranked] == ["B", "C", "A", "E", "D"]
-    assert [r["title"] for r in rank.selected(ranked, 2)] == ["B", "C", "A", "E"]
-    assert [r["title"] for r in rank.selected(ranked, 2, top=2)] == ["B", "C"]
-    with contextlib.redirect_stdout(io.StringIO()):   # poids 0 : pertinence d'abord, citations à égalité
-        by_relevance = rank.rank(records, "sujet", lambda topic, r: scores[r["title"]], citation_weight=0)
-    assert [r["title"] for r in by_relevance] == ["C", "A", "B", "E", "D"]
+    # Poids 1 par défaut : une 2 ne passe jamais une 3 (B : 2 + 0,99 < A : 3) ; à note égale, le percentile départage.
+    # Sans résumé, E est plafonné à 2.
+    assert [r["title"] for r in ranked] == ["C", "A", "B", "E", "D"]
+    assert [r["title"] for r in rank.selected(ranked, 2)] == ["C", "A", "B", "E"]
+    assert [r["title"] for r in rank.selected(ranked, 2, top=2)] == ["C", "A"]
+    with contextlib.redirect_stdout(io.StringIO()):   # poids 2 : B (2 + 2 × 0,99) passe devant C (3 + 2 × 0,2) et A
+        by_citations = rank.rank(records, "sujet", lambda topic, r: scores[r["title"]], citation_weight=2)
+    assert [r["title"] for r in by_citations] == ["B", "C", "A", "E", "D"]
     assert "language (French or English) does not matter" in rank.PROMPT
 
 
@@ -102,14 +103,43 @@ def test_secrets_drive_source_status():
 
 def test_review_requires_both_languages():
     parser = search_manager.build_parser()
-    a = parser.parse_args(["review", "--dir", "x", "--fr", "didactique", "--en", "computing education"])
+    a = parser.parse_args(["review", "--dir", "x", "--fr", "didactique", "--en", "computing education",
+                           "--core", "didactique de l'informatique"])
     assert a.fr + a.en == ["didactique", "computing education"] and not hasattr(a, "lang")
     with contextlib.redirect_stderr(io.StringIO()):
         try:
-            parser.parse_args(["review", "--dir", "x", "--fr", "didactique"])
+            parser.parse_args(["review", "--dir", "x", "--fr", "didactique", "--core", "didactique"])
             raise AssertionError("--en devrait être obligatoire")
         except SystemExit:
             pass
+        try:
+            parser.parse_args(["review", "--dir", "x", "--fr", "didactique", "--en", "computing education"])
+            raise AssertionError("--core devrait être obligatoire")
+        except SystemExit:
+            pass
+
+
+def test_core_terms_add_most_cited_by_title():
+    from providers import openalex
+    calls = []
+    work = {"id": "https://openalex.org/W1", "title": "Peer Learning and Assessment", "publication_year": 1999,
+            "doi": "https://doi.org/10.1080/0260293990240405", "cited_by_count": 1423,
+            "citation_normalized_percentile": {"value": 0.99}, "authorships": []}
+    old = openalex._get
+    openalex._get = lambda **params: calls.append(params) or [work]
+    try:
+        found = openalex.most_cited('peer "learning", x', 10)
+    finally:
+        openalex._get = old
+    # Expression exacte dans le titre, triée par citations (guillemets et virgules de l'agent neutralisés).
+    assert calls == [{"filter": 'title.search:"peer learning x"', "sort": "cited_by_count:desc", "per-page": 10}]
+    assert found[0]["cited_by"] == 1423 and found[0]["citation_percentile"] == 0.99
+
+    search.most_cited = lambda term, n: [rec("openalex", term, f"Classique {term}")]
+    search.lookup_dois = lambda dois: {}
+    with contextlib.redirect_stdout(io.StringIO()):
+        out = search.search([], [], 10, core=["peer learning", "peer tutoring"])
+    assert [r["title"] for r in out] == ["Classique peer learning", "Classique peer tutoring"]
 
 
 def test_review_folder_is_dated():
@@ -120,7 +150,7 @@ def test_review_folder_is_dated():
 
 def test_sources_quoted_or_not():
     parser = search_manager.build_parser()
-    base = ["review", "--dir", "x", "--fr", "a", "--en", "b", "--sources"]
+    base = ["review", "--dir", "x", "--fr", "a", "--en", "b", "--core", "c", "--sources"]
     for argv in (["hal tel", "eric"], ["hal", "tel", "eric"]):
         with contextlib.redirect_stdout(io.StringIO()):
             assert search.usable_sources(parser.parse_args(base + argv).sources) == ["hal", "tel", "eric"]

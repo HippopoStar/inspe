@@ -7,7 +7,7 @@ import requests
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
 RANK_MODEL = os.environ.get("RANK_MODEL", "qwen3:4b-instruct")
-CITATION_WEIGHT = 2.0   # voir sort_key ; 0 = classement par pertinence seule
+CITATION_WEIGHT = 1.0   # voir sort_key ; 0 = classement par pertinence seule
 LABELS = {0: "hors sujet", 1: "lien indirect", 2: "pertinent", 3: "au cœur du sujet"}
 
 # En anglais : Qwen3 suit mieux des consignes en anglais. Barème strict : au premier essai, la quasi-totalité
@@ -54,8 +54,10 @@ def ollama_scorer(model: str = RANK_MODEL):
 
 def sort_key(rec: dict, citation_weight: float):
     """Score = pertinence (0-3) + poids × percentile de citations (0-1), puis citations brutes à égalité.
-    Poids 2 : une notice « pertinent » (2) citée dans le top 1 % (≈ 4) passe devant une « au cœur du sujet » (3)
-    jamais citée. Le filtre `--min-relevance` reste appliqué avant : les citations ne font jamais entrer du hors-sujet.
+    Poids 1 (défaut) : les citations départagent les notices de même note et choisissent les notées 2 qui complètent
+    la liste ; une 2 ne passe jamais devant une 3 (2 + 0,99 < 3). Au-delà de 1, une 2 très citée passe devant une 3 :
+    au 2e essai, un poids 2 évinçait 13 des 15 notices notées 3, faute de percentile (ERIC sans DOI, articles récents).
+    Le filtre `--min-relevance` reste appliqué avant : les citations ne font jamais entrer du hors-sujet.
     Percentile inconnu = aucun bonus (pas une pénalité) ; non noté = en dernier."""
     if rec.get("relevance") is None:
         return (-1, -1)
