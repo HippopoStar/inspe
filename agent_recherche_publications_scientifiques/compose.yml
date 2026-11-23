@@ -87,13 +87,14 @@ services:
       - ./pi/config/models.json:/home/node/.pi/agent/models.json:ro
       - ./pi/config/skills:/home/node/.pi/agent/skills:ro
       - ./pi/config/sessions:/home/node/.pi/agent/sessions
+      # Clés API : un fichier par clé dans ./secrets (ex. secrets/openalex_api_key), lu dans /run/secrets
+      # comme des docker secrets. Monté en dossier plutôt qu'en `secrets:` car compose exige que chaque
+      # fichier déclaré existe ; ici chaque clé reste facultative. Voir : search_manager.py sources --check
+      - ./secrets:/run/secrets:ro
     environment:
       # Utilisé par search_manager.py rank (API native Ollama, sans « réflexion »)
       - OLLAMA_HOST=http://ollama:11434
       - RANK_MODEL=${RANK_MODEL:-qwen3:4b}
-      # Clés gratuites, à mettre dans un fichier .env à côté de compose.yml (voir README)
-      - OPENALEX_API_KEY=${OPENALEX_API_KEY:-}
-      - S2_API_KEY=${S2_API_KEY:-}
     security_opt:
       - no-new-privileges:true
     depends_on:

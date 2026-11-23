@@ -12,11 +12,13 @@ sudo systemctl restart docker
 docker run --rm --gpus all --entrypoint "" ollama/ollama nvidia-smi
 ```
 
-**Clés API (gratuites)**  
-Créer un fichier `.env` à côté de `compose.yml` (il est ignoré par git) :
+**Clés API (facultatives, gratuites)**  
+Un fichier par clé dans `secrets/` (ignoré par git), monté dans `/run/secrets` du conteneur `pi`. La liste, l'effet de chaque clé et où l'obtenir sont dans [secrets/README.md](secrets/README.md). La clé OpenAlex est fortement recommandée (elle sert aussi aux citations de toutes les bases).
+
+Bases accessibles selon les clés fournies (avec une vraie requête de test par base) :
 ```
-OPENALEX_API_KEY=...   # obligatoire depuis février 2026 : https://openalex.org/settings/api
-S2_API_KEY=...         # optionnel, évite les erreurs 429 de Semantic Scholar
+docker compose run --rm --entrypoint python3 pi \
+  /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py sources --check
 ```
 
 **Préparer l'arborescence et démarrer Ollama + Open WebUI**  

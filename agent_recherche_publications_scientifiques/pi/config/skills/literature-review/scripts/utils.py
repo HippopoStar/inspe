@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import unicodedata
@@ -41,6 +42,21 @@ class RateLimitedSession(requests.Session):
 
 
 HTTP_SESSION = RateLimitedSession(min_delay=1.2)
+
+SECRETS_DIR = os.environ.get("SECRETS_DIR", "/run/secrets")
+
+
+def secret(name: str) -> str:
+    """Clé API : fichier /run/secrets/<name> (dossier ./secrets monté par compose), sinon variable
+    d'environnement <NAME>. Chaîne vide si absente : la base concernée est alors désactivée ou limitée."""
+    try:
+        with open(os.path.join(SECRETS_DIR, name), encoding="utf-8") as f:
+            value = f.read().strip()
+        if value:
+            return value
+    except OSError:
+        pass
+    return os.environ.get(name.upper(), "").strip()
 
 
 def build_url(domain: str, path: str) -> str:

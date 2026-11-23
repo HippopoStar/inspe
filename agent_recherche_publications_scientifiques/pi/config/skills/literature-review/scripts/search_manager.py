@@ -16,7 +16,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 
 from utils import HTTP_SESSION, normalize_doi, normalize_title
-from providers import PROVIDERS
+from providers import PROVIDERS, SOURCES, EXCLUDED, status, available
 from providers.openalex import citations_by_doi
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
@@ -91,8 +91,22 @@ def enrich_citations(records: list):
     print(f"[citations] {len(found)}/{len(set(missing))} notices complétées via OpenAlex.")
 
 
+def resolve_sources(names: list) -> list:
+    """`all` = toutes les bases accessibles avec les clés fournies ; les bases sans clé obligatoire sont écartées."""
+    if "all" in names:
+        names = available()
+    usable = []
+    for n in names:
+        if status(n) == "clé manquante":
+            print(f"[{n}] ignoré : clé API manquante (secrets/{SOURCES[n]['key']})")
+        else:
+            usable.append(n)
+    return usable
+
+
 def run_search(queries: list, sources: list, lang, max_results: int) -> list:
     raw = []
+    sources = resolve_sources(sources)
     for query in queries:
         for src in sources:
             try:
@@ -120,6 +134,7 @@ def build_prompt(topic: str, rec: dict) -> str:
         "Note la pertinence de ce document pour le sujet :\n"
         "0 = hors sujet ; 1 = lien indirect ; 2 = pertinent ; 3 = au cœur du sujet.\n"
         "Un document qui reprend les mots du sujet sans le traiter vaut 0 ou 1.\n"
+        "La langue du document (français ou anglais) ne compte pas : seul le contenu est noté.\n"
         'Réponds uniquement en JSON : {"score": <0-3>}'
     )
 
@@ -278,6 +293,26 @@ def export(records: list, theme_dir: str) -> str:
 
 # ---------------------------------------------------------------- commandes
 
+def cmd_sources(a):
+    """Liste explicite des bases accessibles selon les clés fournies ; --check fait une vraie requête par base."""
+    print(f"{'base':16} {'statut':14} {'clé (fichier dans secrets/)':30} remarque")
+    for name, s in SOURCES.items():
+        st = status(name)
+        line = f"{name:16} {st:14} {(s['key'] or '-') + (' (obligatoire)' if s['required'] else ''):30} {s['note']}"
+        if a.check and st != "clé manquante":
+            try:
+                n = len(s["fn"]("education", 1, None))
+                line += f"  -> test OK ({n} résultat)"
+            except Exception as e:
+                code = getattr(getattr(e, "response", None), "status_code", "")
+                line += f"  -> test ÉCHEC {code} {str(e)[:80]}"
+        print(line)
+    print("\nNon intégrées :")
+    for name, why in EXCLUDED.items():
+        print(f"  {name} : {why}")
+    print(f"\nAccessibles maintenant ({len(available())}) : {' '.join(available())}")
+
+
 def cmd_search(a):
     save(a.dir, run_search(a.query, a.sources, a.lang, a.max_results))
 
@@ -300,9 +335,12 @@ def cmd_export(a):
 
 
 def cmd_review(a):
-    """Tout en une commande : un seul appel d'outil pour l'agent."""
-    records = run_search(a.query, a.sources, a.lang, a.max_results)
-    records = rank_records(records, a.topic or " / ".join(a.query), ollama_scorer(a.model))
+    """Tout en une commande : un seul appel d'outil pour l'agent.
+    Requêtes FR et EN obligatoires et aucun filtre de langue : les deux langues conviennent toujours,
+    l'agent n'a donc rien à arbitrer."""
+    queries = a.fr + a.en
+    records = run_search(queries, a.sources, None, a.max_results)
+    records = rank_records(records, a.topic or " / ".join(queries), ollama_scorer(a.model))
     save(a.dir, records)
     keep = selected(records, a.min_relevance)
     download_pdfs(keep, os.path.join(a.dir, "pdfs"))
@@ -315,12 +353,17 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Sélection de publications scientifiques")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    def common(p, search=False, rank=False, select=False):
+    def common(p, search=False, rank=False, select=False, bilingual=False):
         p.add_argument("--dir", required=True, help="Dossier du thème, ex. /workspace/mon_theme")
         if search:
-            p.add_argument("--query", nargs="+", required=True, help="Une ou plusieurs requêtes (FR et EN)")
-            p.add_argument("--sources", nargs="+", default=["openalex", "hal"], choices=list(PROVIDERS))
-            p.add_argument("--lang", default=None, help="Filtre langue ISO (fr, en) ; omettre pour tout garder")
+            if bilingual:
+                p.add_argument("--fr", nargs="+", required=True, help="Requêtes en français (2 ou plus)")
+                p.add_argument("--en", nargs="+", required=True, help="Requêtes en anglais (2 ou plus)")
+            else:
+                p.add_argument("--query", nargs="+", required=True, help="Une ou plusieurs requêtes")
+                p.add_argument("--lang", default=None, help="Filtre langue ISO (fr, en) ; omettre pour tout garder")
+            p.add_argument("--sources", nargs="+", default=["openalex", "hal", "crossref"],
+                           choices=list(PROVIDERS) + ["all"], help="« all » = toutes les bases accessibles")
             p.add_argument("--max-results", type=int, default=10, help="Résultats max par requête et par base")
         if rank:
             p.add_argument("--topic", help="Le sujet en une phrase (défaut : les requêtes)")
@@ -328,8 +371,11 @@ def build_parser():
         if select:
             p.add_argument("--min-relevance", type=int, default=2, help="Note minimale (0-3) pour être retenu")
 
-    common(sub.add_parser("review", help="search + rank + download + export"), search=True, rank=True, select=True)
+    common(sub.add_parser("review", help="search + rank + download + export"),
+           search=True, rank=True, select=True, bilingual=True)
     common(sub.add_parser("search"), search=True)
+    p = sub.add_parser("sources", help="Bases accessibles selon les clés API fournies")
+    p.add_argument("--check", action="store_true", help="Tester chaque base par une vraie requête")
     p = sub.add_parser("rank")
     common(p, rank=True)
     p.set_defaults(topic=None)
@@ -344,5 +390,5 @@ if __name__ == "__main__":
     args = build_parser().parse_args()
     if args.cmd == "rank" and not args.topic:
         sys.exit("rank : --topic est obligatoire")
-    {"review": cmd_review, "search": cmd_search, "rank": cmd_rank,
+    {"review": cmd_review, "search": cmd_search, "rank": cmd_rank, "sources": cmd_sources,
      "download": cmd_download, "export": cmd_export}[args.cmd](args)

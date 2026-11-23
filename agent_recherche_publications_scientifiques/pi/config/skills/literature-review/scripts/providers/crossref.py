@@ -7,9 +7,13 @@ TYPES = {
 }
 
 
-def search(query: str, max_results: int, lang: str = None) -> list:
+def search(query: str, max_results: int, lang: str = None, prefix: str = None, source: str = "crossref") -> list:
+    """`prefix` restreint à un éditeur par son préfixe DOI : c'est ainsi qu'on interroge Cairn, Persée,
+    OpenEdition, JSTOR ou Taylor & Francis, qui n'ont pas d'API de recherche publique."""
     url = build_url("api.crossref.org", "/works")
     params = {"query": query, "rows": max_results}
+    if prefix:
+        params["filter"] = f"prefix:{prefix}"
     r = HTTP_SESSION.get(url, params=params, timeout=20)
     r.raise_for_status()
 
@@ -31,7 +35,7 @@ def search(query: str, max_results: int, lang: str = None) -> list:
         abstract = re.sub(r"<[^>]+>", "", item.get("abstract", ""))
 
         results.append(make_record(
-            source="crossref",
+            source=source,
             doc_id=item.get("DOI", ""),
             title=first(item.get("title", "")),
             authors=authors,

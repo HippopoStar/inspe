@@ -1,1 +1,4 @@
 .env
+# Clés API : jamais dans git
+secrets/*
+!secrets/README.md

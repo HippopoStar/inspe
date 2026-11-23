@@ -28,7 +28,7 @@ Objectif retenu :
   **À vérifier** : `docker exec ollama ollama ps` pendant une réponse doit afficher `100% GPU`.
 - Open WebUI : `RAG_EMBEDDING_MODEL=BAAI/bge-m3`.
   **Pourquoi** : le défaut (`all-MiniLM-L6-v2`) ne comprend que l'anglais. bge-m3 est multilingue et tourne sur CPU (la VRAM reste au LLM). Réindexer après le changement.
-- Service `pi` : `OLLAMA_HOST`, `RANK_MODEL`, `OPENALEX_API_KEY`, `S2_API_KEY` (lus depuis un fichier `.env`). L'ancienne variable `OLLAMA_BASE_URL` n'était utilisée par rien.
+- Service `pi` : `OLLAMA_HOST` et `RANK_MODEL`. L'ancienne variable `OLLAMA_BASE_URL` n'était utilisée par rien. Les clés API passent par `./secrets` (voir « Ajout : bases de données » plus bas).
 
 ### `pi/config/models.json` et `pi/config/AGENTS.md`
 - qwen3:4b passe en `"reasoning": false` et `/no_think` est ajouté en tête de `AGENTS.md` (interrupteur reconnu par Qwen3).
@@ -78,7 +78,42 @@ Les étapes restent disponibles séparément : `search`, `rank`, `download`, `ex
 - Test hors ligne : fusion des doublons, lecture des notes, ordre de classement, contenu du RIS et du tableau. Lancer : `python3 test_search_manager.py`.
 
 ### `README.md` et `.gitignore`
-- Clés API dans `.env` (ignoré par git), vérification GPU, description des fichiers produits, marche à suivre pour charger les PDF dans une collection Open WebUI.
+- Clés API dans `secrets/` (ignoré par git), vérification GPU, description des fichiers produits, marche à suivre pour charger les PDF dans une collection Open WebUI.
+
+## Ajout : bases de données demandées
+
+Règle appliquée : les bases sans clé sont intégrées d'office ; celles qui demandent une clé sont facultatives (fichier dans `secrets/`) ; une commande liste explicitement les bases accessibles selon les clés fournies.
+
+| Base demandée | Statut | Comment |
+|---|---|---|
+| HAL, DUMAS, TEL | intégrées, sans clé | API HAL ; DUMAS et TEL sont des portails HAL (`/search/dumas/`, `/search/tel/`) |
+| OpenAlex | intégrée, clé recommandée | sans clé : quota très réduit (une erreur 525 observée lors du test) |
+| Crossref, ERIC | intégrées, sans clé | déjà présentes |
+| Cairn, Persée, OpenEdition, JSTOR, Taylor & Francis | intégrées, sans clé, **via Crossref** | aucune n'a d'API de recherche publique ; on interroge Crossref filtré sur leur préfixe DOI (10.3917, 10.3406, 10.4000, 10.2307, 10.1080). Métadonnées seulement, textes souvent payants |
+| CORE | intégrée, clé facultative | sans clé : quota bas, service parfois saturé |
+| Semantic Scholar | intégrée, clé facultative | sans clé : erreurs 429 fréquentes |
+| Springer Nature | facultative, clé obligatoire | Meta API v2 |
+| Scopus | facultative, clé obligatoire | résultats complets seulement depuis le réseau d'un établissement abonné ou avec `scopus_insttoken` |
+| Web of Science | facultative, clé obligatoire | API Starter, sans résumés (la note de pertinence se fait alors sur le titre seul) |
+| Google Scholar | **non intégrée** | aucune API ; le site bloque les robots (CAPTCHA) et l'interdit dans ses conditions |
+| Pascal et Francis | **non intégrée** | base INIST figée (1972-2015), sans API de recherche publique |
+| EBSCO | **non intégrée** | API EDS réservée aux établissements abonnés (compte activé par EBSCO) ; ajoutable si l'université fournit un accès API |
+| Sci-Hub | **exclue** | diffuse des articles en violation du droit d'auteur, bloqué en France par décision de justice |
+| DOAJ | conservée | déjà présente, sans clé |
+
+- **Clés en « docker secrets »** : le dossier `./secrets` est monté en lecture seule sur `/run/secrets`, l'emplacement standard des docker secrets, avec un fichier par clé (liste dans `secrets/README.md`). Le script lit `/run/secrets/<nom>`, sinon la variable d'environnement `<NOM>`.
+  **Pourquoi un dossier plutôt que la section `secrets:` de compose** : compose exige que chaque fichier déclaré existe, ce qui rendrait chaque clé obligatoire.
+- **`search_manager.py sources [--check]`** : tableau de chaque base (`ok` / `limité` / `clé manquante`), avec la clé attendue, les bases non intégrées et leur raison. `--check` fait une vraie requête par base pour vérifier que la clé fonctionne.
+- **`--sources all`** : toutes les bases accessibles avec les clés présentes. Une base dont la clé obligatoire manque est ignorée avec un message, sans faire échouer la recherche.
+- **Non testé** : Springer, Scopus et Web of Science (écrits d'après leur documentation, faute de clé). Les vérifier avec `sources --check` une fois les clés ajoutées.
+
+## Ajout : français et anglais sans hésitation
+
+Le modèle ne doit pas perdre de temps à choisir une langue : les deux conviennent toujours.
+- `review` exige `--fr` **et** `--en` (au moins une requête chacun) et n'a plus d'option `--lang`. L'agent n'a donc aucun choix à faire.
+- La consigne de notation précise que la langue du document ne compte pas.
+- `AGENTS.md` et `SKILL.md` le disent explicitement.
+- L'option `--lang` reste disponible pour la commande `search` lancée à la main.
 
 ## Résultats du test réel (23/11, sans clé API, sans Ollama)
 

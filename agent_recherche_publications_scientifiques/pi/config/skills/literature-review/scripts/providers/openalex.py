@@ -1,9 +1,7 @@
-import os
-from utils import HTTP_SESSION, build_url, make_record, normalize_doi
+from utils import HTTP_SESSION, build_url, make_record, normalize_doi, secret
 
 # Depuis le 13/02/2026, OpenAlex exige une clé API gratuite (openalex.org/settings/api) ;
 # sans clé, le quota est fortement réduit. Le paramètre mailto est ignoré.
-API_KEY = os.environ.get("OPENALEX_API_KEY", "")
 
 TYPES = {
     "article": "JOUR", "review": "JOUR", "preprint": "JOUR", "letter": "JOUR", "editorial": "JOUR",
@@ -12,8 +10,9 @@ TYPES = {
 
 
 def _params(**params) -> dict:
-    if API_KEY:
-        params["api_key"] = API_KEY
+    key = secret("openalex_api_key")
+    if key:
+        params["api_key"] = key
     return params
 
 

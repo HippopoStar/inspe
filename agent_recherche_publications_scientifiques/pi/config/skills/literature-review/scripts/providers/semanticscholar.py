@@ -1,9 +1,7 @@
-import os
-from utils import HTTP_SESSION, build_url, make_record
+from utils import HTTP_SESSION, build_url, make_record, secret
 
 # Sans clé, le quota partagé renvoie souvent des 429. Clé gratuite sur demande :
 # https://www.semanticscholar.org/product/api#api-key-form
-API_KEY = os.environ.get("S2_API_KEY", "")
 
 
 def search(query: str, max_results: int, lang: str = None) -> list:
@@ -13,7 +11,8 @@ def search(query: str, max_results: int, lang: str = None) -> list:
         "limit": max_results,
         "fields": "paperId,title,authors,year,abstract,openAccessPdf,externalIds,citationCount,venue,journal,url",
     }
-    headers = {"x-api-key": API_KEY} if API_KEY else {}
+    key = secret("s2_api_key")
+    headers = {"x-api-key": key} if key else {}
     r = HTTP_SESSION.get(url, params=params, headers=headers, timeout=20)
     r.raise_for_status()
 

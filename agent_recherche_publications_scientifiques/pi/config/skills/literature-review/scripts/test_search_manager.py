@@ -64,6 +64,38 @@ def test_export_ris_and_markdown():
     assert "Titre / avec barre" in md and "| ? |" in md and "| oui |" in md
 
 
+def test_secrets_drive_source_status():
+    import utils
+    import providers
+    with tempfile.TemporaryDirectory() as d:
+        old = utils.SECRETS_DIR
+        utils.SECRETS_DIR = d
+        try:
+            os.environ.pop("SPRINGER_API_KEY", None)
+            assert providers.status("springer") == "clé manquante"   # clé obligatoire absente
+            assert providers.status("core") == "limité"               # clé optionnelle absente
+            assert providers.status("hal") == "ok"                    # aucune clé
+            assert "springer" not in providers.available()
+            open(os.path.join(d, "springer_api_key"), "w").write("  abc123\n")
+            assert utils.secret("springer_api_key") == "abc123"
+            assert providers.status("springer") == "ok" and "springer" in providers.available()
+            assert sm.resolve_sources(["all"]) == providers.available()
+        finally:
+            utils.SECRETS_DIR = old
+
+
+def test_review_requires_both_languages():
+    p = sm.build_parser()
+    a = p.parse_args(["review", "--dir", "x", "--fr", "didactique", "--en", "computing education"])
+    assert a.fr + a.en == ["didactique", "computing education"] and not hasattr(a, "lang")
+    try:
+        p.parse_args(["review", "--dir", "x", "--fr", "didactique"])
+        raise AssertionError("--en devrait être obligatoire")
+    except SystemExit:
+        pass
+    assert "La langue du document" in sm.build_prompt("sujet", {"title": "t"})
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

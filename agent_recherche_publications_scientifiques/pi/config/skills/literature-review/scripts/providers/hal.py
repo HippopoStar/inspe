@@ -6,8 +6,9 @@ TYPES = {
 }
 
 
-def search(query: str, max_results: int, lang: str = None) -> list:
-    url = build_url("api.archives-ouvertes.fr", "/search/")
+def search(query: str, max_results: int, lang: str = None, portal: str = "", source: str = "hal") -> list:
+    """`portal` = portail HAL : « tel » (thèses) ou « dumas » (mémoires de master)."""
+    url = build_url("api.archives-ouvertes.fr", f"/search/{portal}/" if portal else "/search/")
     safe_query = sanitize_lucene_query(query)
     q = f"({safe_query})"
     if lang:
@@ -26,7 +27,7 @@ def search(query: str, max_results: int, lang: str = None) -> list:
     results = []
     for d in r.json().get("response", {}).get("docs", []):
         results.append(make_record(
-            source="hal",
+            source=source,
             doc_id=d.get("halId_s", ""),
             title=first(d.get("title_s", "")),
             authors=d.get("authFullName_s", []),
