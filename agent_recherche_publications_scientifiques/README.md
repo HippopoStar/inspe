@@ -48,7 +48,7 @@ docker exec ollama ollama ps
 **Résultat d'une sélection** (`workspace/<thème>/`)  
 - `SELECTION.md` : tableau classé par pertinence (0-3, notée par le LLM), puis percentile de citations (OpenAlex, corrigé de l'âge et du domaine), puis citations brutes. `?` = inconnu (fréquent pour HAL sans DOI), pas zéro.
 - `selection.ris` : à importer dans Zotero (Fichier > Importer) ; les PDF téléchargés sont joints. Pour les publications avec DOI, la baguette magique de Zotero (« Ajouter un document par son identifiant ») récupère aussi des métadonnées complètes.
-- `pdfs/` : PDF en accès libre des publications retenues.
+- `pdfs/` : PDF en accès libre des publications retenues. HAL protège ses fichiers par une page anti-robot : ces PDF-là sont à télécharger à la main (colonne PDF = `[lien]` dans `SELECTION.md`).
 - `metadata.json` : toutes les notices, y compris celles écartées.
 
 Commandes séparées si besoin : `search_manager.py search|rank|download|export --dir ...` (`--help`).  

@@ -75,8 +75,9 @@ def deduplicate_records(records: list) -> list:
 
 
 def enrich_citations(records: list):
-    """Ajoute les citations OpenAlex aux notices qui ont un DOI mais pas de compteur (HAL, ERIC, DOAJ)."""
-    missing = [r["doi"] for r in records if r.get("doi") and r.get("cited_by") is None]
+    """Prend les citations d'OpenAlex pour toute notice avec DOI sans percentile (HAL, Crossref, S2, DOAJ…) :
+    une seule source de comptage, sinon les chiffres de bases différentes ne sont pas comparables."""
+    missing = [r["doi"] for r in records if r.get("doi") and r.get("citation_percentile") is None]
     if not missing:
         return
     try:
@@ -85,7 +86,7 @@ def enrich_citations(records: list):
         print(f"[citations] OpenAlex indisponible : {e}")
         return
     for r in records:
-        if r.get("doi") in found and r.get("cited_by") is None:
+        if r.get("doi") in found and r.get("citation_percentile") is None:
             r["cited_by"], r["citation_percentile"] = found[r["doi"]]
     print(f"[citations] {len(found)}/{len(set(missing))} notices complétées via OpenAlex.")
 
@@ -188,7 +189,11 @@ def download_pdfs(records: list, pdf_dir: str):
             resp = HTTP_SESSION.get(item["pdf_url"], timeout=30, allow_redirects=True)
             resp.raise_for_status()
             if b"%PDF" not in resp.content[:1024]:
-                print(f"IGNORÉ (contenu non-PDF) : {item['id']}")
+                if b"not a bot" in resp.content[:2000]:
+                    # HAL protège ses fichiers par une page anti-robot : téléchargement manuel (lien dans SELECTION.md)
+                    print(f"BLOQUÉ (anti-robot) : {item['id']} -> à télécharger à la main : {item['pdf_url']}")
+                else:
+                    print(f"IGNORÉ (contenu non-PDF) : {item['id']}")
                 continue
             with open(filepath, "wb") as f:
                 f.write(resp.content)
@@ -256,7 +261,8 @@ def to_markdown(records: list, theme_dir: str) -> str:
             f"{r.get('relevance')} ({RELEVANCE_LABELS.get(r.get('relevance'), '?')})",
             "?" if r.get("cited_by") is None else r["cited_by"],
             "?" if pct is None else f"{round(pct * 100)} %",
-            r.get("year"), r.get("title"), auth, r.get("doi") or "", "oui" if has_pdf else "non",
+            r.get("year"), r.get("title"), auth, r.get("doi") or "",
+            "oui" if has_pdf else (f"[lien]({r['pdf_url']})" if r.get("pdf_url") else "non"),
         )) + " |")
     return "\n".join(rows) + "\n"
 
