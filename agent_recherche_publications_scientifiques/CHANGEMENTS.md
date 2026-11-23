@@ -73,6 +73,8 @@
 **Corrections**
 - Bouton Annuler de `start-pi.sh`.
 - Seuls de vrais liens PDF sont gardés.
+- OpenAlex sans clé, quota du jour épuisé, répond « Retry-After: 3347 » (attendre jusqu'à minuit UTC) : la commande le respectait et le 6e essai est resté figé plus de 16 min, GPU à l'arrêt, sans rien afficher. Le délai demandé n'est plus suivi (3 nouvelles tentatives à 2, 4 et 8 s), et après un échec définitif OpenAlex n'est plus interrogé pendant la commande : vérifié en réel, 12 s pour le premier appel, puis immédiat, au lieu d'une heure par requête. La recherche continue avec les autres bases, sans citations ni classiques : la clé OpenAlex gratuite reste nécessaire.
+- La sortie est aussi écrite au fil de l'eau, heure en tête de ligne, dans `<dossier>/progress.log` : Pi ne l'affiche qu'à la fin de la commande. La recherche par titre et la boule de neige annoncent leur début et leur progression.
 - Une même œuvre sous deux titres sans DOI commun (« X : sous-titre » et « X ») est fusionnée quand le titre principal, l'année et le premier auteur concordent : le livre de Boud apparaissait deux fois.
 - ERIC termine une liste d'auteurs tronquée par « And Others » : ce n'est plus importé comme un auteur (`AU - Others, And` dans le `.ris`).
 - Dépendances Python inutilisées retirées.

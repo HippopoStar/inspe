@@ -16,7 +16,10 @@ def complete_by_title(records: list, min_relevance: int):
     todo = [r for r in records if (r.get("relevance") or 0) >= min_relevance
             and not r["doi"] and r["citation_percentile"] is None]
     found = 0
-    for rec in todo:
+    print(f"[openalex] recherche par titre de {len(todo)} notice(s) pertinente(s) sans DOI…")
+    for i, rec in enumerate(todo, 1):
+        if i % 10 == 0:
+            print(f"[openalex] {i}/{len(todo)} cherchées par titre")
         try:
             match = openalex.find_by_title(rec["title"], rec["year"])
         except Exception as e:
@@ -35,6 +38,7 @@ def snowball(records: list, min_relevance: int, limit: int, min_citers: int = MI
     relevant = [r for r in records if (r.get("relevance") or 0) >= min_relevance]
     if not limit or not relevant:
         return []
+    print(f"[snowball] lecture des références des {len(relevant)} notices pertinentes…")
     try:
         found = openalex.references([r["doi"] for r in relevant if r["doi"] and r["source"] != "openalex"],
                                     [r["id"].split(":", 1)[1] for r in relevant if r["source"] == "openalex"])

@@ -298,6 +298,37 @@ def test_eric_authors_drop_and_others():
     assert [r["authors"] for r in found] == [["Lucker, G. William"], []]
 
 
+def test_openalex_quota_out_fails_fast():
+    from providers import openalex
+    # Retry-After ignoré : sans clé, OpenAlex demandait d'attendre jusqu'à minuit UTC.
+    assert net.HTTP.get_adapter("https://api.openalex.org").max_retries.respect_retry_after_header is False
+    import requests
+    with mock.patch.object(openalex, "_down", False), \
+            mock.patch.object(openalex.HTTP, "get", side_effect=requests.exceptions.RetryError("429")) as get:
+        for _ in range(3):
+            try:
+                openalex.most_cited("peer learning", 10)
+                raise AssertionError("l'échec doit remonter, les étapes appelantes l'affichent")
+            except RuntimeError:
+                pass
+    assert get.call_count == 1      # une fois en panne, OpenAlex n'est plus interrogé pendant la commande
+
+
+def test_review_writes_live_progress_log():
+    with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as shown, \
+            mock.patch.object(rank, "ollama_scorer"), mock.patch.object(search, "search", return_value=[]), \
+            mock.patch.object(rank, "grade"), mock.patch.object(enrich, "complete_by_title"), \
+            mock.patch.object(enrich, "snowball", return_value=[]), mock.patch.object(export, "write", return_value="fin"):
+        args = search_manager.build_parser().parse_args(
+            ["review", "--dir", os.path.join(d, "x"), "--fr", "a", "--en", "b", "--core", "c"])
+        search_manager.cmd_review(args)
+        with open(os.path.join(args.dir, "progress.log"), encoding="utf-8") as f:
+            log = f.read()
+    import re
+    assert re.match(r"\d\d:\d\d:\d\d Dossier : ", log) and "fin" in log    # heure en tête, tout y est
+    assert "fin" in shown.getvalue() and sys.stdout is not None           # Pi reçoit toujours la sortie
+
+
 def test_review_folder_is_dated_and_derived_from_core():
     import re
     parser = search_manager.build_parser()

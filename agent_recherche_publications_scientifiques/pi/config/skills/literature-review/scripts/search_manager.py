@@ -5,6 +5,7 @@
 metadata.json (toutes les notices), selection.ris (import Zotero), SELECTION.md (tableau avec liens).
 """
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -47,8 +48,41 @@ def review_dir(a) -> str:
     return dated(a.dir or os.path.join(WORKSPACE, ascii_slug(a.core[0], 30).lower()))
 
 
+@contextlib.contextmanager
+def progress_log(folder: str):
+    """Pi n'affiche la sortie d'une commande qu'à la fin : elle est aussi écrite au fil de l'eau, heure en tête de
+    ligne, dans <dossier>/progress.log (à suivre avec tail -f). Au 6e essai, 16 min sans rien voir."""
+    os.makedirs(folder, exist_ok=True)
+    out = sys.stdout
+    with open(os.path.join(folder, "progress.log"), "a", encoding="utf-8") as log:
+        class Tee:
+            line_start = True
+
+            def write(self, text):
+                out.write(text)
+                for part in text.splitlines(keepends=True):
+                    log.write((f"{datetime.now():%H:%M:%S} " if Tee.line_start else "") + part)
+                    Tee.line_start = part.endswith("\n")
+                log.flush()
+
+            def flush(self):
+                out.flush()
+
+        sys.stdout = Tee()
+        try:
+            yield
+        finally:
+            sys.stdout = out
+
+
 def cmd_review(a):
     a.dir = review_dir(a)
+    with progress_log(a.dir):
+        print(f"Dossier : {a.dir} (suivi en direct : tail -f {a.dir}/progress.log)")
+        _review(a)
+
+
+def _review(a):
     # Requêtes FR et EN obligatoires, sans filtre de langue : les deux langues conviennent toujours.
     queries = a.fr + a.en
     # Le correcteur ne voit que ce texte : au 4e essai, « vs traditional teaching » dans le sujet faisait noter 3 des

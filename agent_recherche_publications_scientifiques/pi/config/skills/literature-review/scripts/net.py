@@ -38,7 +38,9 @@ class PoliteSession(requests.Session):
         self.headers.update({"User-Agent": "Mozilla/5.0 (compatible; PiAcademicResearch/1.0)",
                              "Accept": "application/json"})
         retry = Retry(total=3, backoff_factor=2.0, status_forcelist=(429, 500, 502, 503, 504),
-                      allowed_methods=("GET",), respect_retry_after_header=True)
+                      # Pas Retry-After : OpenAlex sans clé, quota du jour épuisé, répond « Retry-After: 3347 »
+                      # (jusqu'à minuit UTC) ; le respecter figeait le 6e essai une heure sans rien afficher.
+                      allowed_methods=("GET",), respect_retry_after_header=False)
         self.mount("https://", HTTPAdapter(max_retries=retry))
         self.mount("http://", HTTPAdapter(max_retries=retry))
 

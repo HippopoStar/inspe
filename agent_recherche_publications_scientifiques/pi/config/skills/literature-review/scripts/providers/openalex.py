@@ -1,5 +1,7 @@
 """OpenAlex : recherche, et source unique des citations et des PDF légaux (données Unpaywall incluses).
 Clé gratuite exigée depuis février 2026 (openalex.org/settings/api) ; sans clé, quota très réduit."""
+import requests
+
 from net import HTTP, secret
 from records import make_record, normalize_doi, normalize_title
 
@@ -8,10 +10,23 @@ TYPES = {"article": "JOUR", "review": "JOUR", "preprint": "JOUR", "letter": "JOU
          "book": "BOOK", "book-chapter": "CHAP", "dissertation": "THES", "report": "RPRT"}
 
 
+_down = False   # quota épuisé ou panne malgré les nouvelles tentatives : inutile d'insister pendant cette commande
+
+
 def _get(**params) -> list:
+    """Après un échec définitif (quota du jour épuisé sans clé), les appels suivants échouent aussitôt : sans cela,
+    chacune des dizaines de requêtes de la recherche par titre attendait ses nouvelles tentatives."""
+    global _down
+    if _down:
+        raise RuntimeError("OpenAlex ignoré pour la suite (quota épuisé ? clé gratuite : secrets/README.md)")
     if secret("openalex_api_key"):
         params["api_key"] = secret("openalex_api_key")
-    r = HTTP.get(URL, params=params, timeout=20)
+    try:
+        r = HTTP.get(URL, params=params, timeout=20)
+    except requests.exceptions.RetryError:
+        _down = True
+        raise RuntimeError("OpenAlex ne répond plus (quota du jour épuisé sans clé ? clé gratuite : "
+                           "secrets/README.md) ; ignoré pour la suite") from None
     r.raise_for_status()
     return r.json().get("results", [])
 

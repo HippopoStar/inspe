@@ -49,6 +49,11 @@ Pi lance une seule commande (`search_manager.py review`, voir [SKILL.md](pi/conf
 
 Le poids des citations se règle avec `--citation-weight` (1 par défaut : une notice notée 2 ne passe jamais devant une notée 3 ; au-delà, une 2 très citée le peut ; 0 = pertinence seule). Il ne fait jamais entrer une notice sous `--min-relevance`.
 
+Pi n'affiche la sortie de la commande qu'à la fin. Pour suivre la recherche en direct (heure en tête de ligne) :
+```
+tail -f "$(ls -td workspace/*/ | head -1)progress.log"
+```
+
 Vérifications :
 - Pendant une réponse, `docker exec ollama ollama ps` doit afficher `100% GPU`.
 - Test hors ligne : `python3 pi/config/skills/literature-review/scripts/test_search_manager.py`.
