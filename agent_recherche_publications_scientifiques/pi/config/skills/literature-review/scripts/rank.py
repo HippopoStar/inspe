@@ -9,16 +9,22 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
 RANK_MODEL = os.environ.get("RANK_MODEL", "qwen3:4b-instruct")
 LABELS = {0: "hors sujet", 1: "lien indirect", 2: "pertinent", 3: "au cœur du sujet"}
 
-PROMPT = """Sujet de recherche : {topic}
+# En anglais : Qwen3 suit mieux des consignes en anglais. Barème strict : au premier essai, la quasi-totalité
+# des notices (même un article sur Ossian) recevait 2 avec un barème plus vague.
+PROMPT = """Research topic: {topic}
 
-Titre : {title}
-Résumé : {abstract}
+Title: {title}
+Abstract: {abstract}
 
-Note la pertinence de ce document pour le sujet :
-0 = hors sujet ; 1 = lien indirect ; 2 = pertinent ; 3 = au cœur du sujet.
-Un document qui reprend les mots du sujet sans le traiter vaut 0 ou 1.
-La langue du document (français ou anglais) ne compte pas : seul le contenu est noté.
-Réponds uniquement en JSON : {{"score": <0-3>}}"""
+Rate how relevant this document is to the research topic:
+3 = the topic's core concept is the document's main subject;
+2 = the document studies the core concept, but as a secondary aspect;
+1 = same broad field, but the core concept is not studied;
+0 = off topic.
+A document that shares only generic words with the topic (e.g. "process", "learning", "comparative", "pedagogy") is worth 0.
+If unsure between two scores, give the lower one.
+The document's language (French or English) does not matter.
+Answer only in JSON: {{"score": <0-3>}}"""
 
 
 def parse_score(text: str):
@@ -35,7 +41,7 @@ def parse_score(text: str):
 def ollama_scorer(model: str = RANK_MODEL):
     """Appel direct à l'API native d'Ollama : pas de « réflexion », réponse JSON imposée, température 0."""
     def score(topic: str, rec: dict):
-        prompt = PROMPT.format(topic=topic, title=rec["title"], abstract=(rec["abstract"] or "(aucun)")[:1500])
+        prompt = PROMPT.format(topic=topic, title=rec["title"], abstract=(rec["abstract"] or "(none)")[:1500])
         r = requests.post(f"{OLLAMA_HOST}/api/chat", timeout=180, json={
             "model": model, "messages": [{"role": "user", "content": prompt}], "stream": False, "think": False,
             "format": {"type": "object", "properties": {"score": {"type": "integer"}}, "required": ["score"]},

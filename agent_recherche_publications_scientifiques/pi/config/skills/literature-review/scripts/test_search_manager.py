@@ -50,7 +50,7 @@ def test_rank_order_and_selection():
     assert [r["title"] for r in ranked] == ["C", "A", "B", "D"]
     assert [r["title"] for r in rank.selected(ranked, 2)] == ["C", "A", "B"]
     assert [r["title"] for r in rank.selected(ranked, 2, top=2)] == ["C", "A"]
-    assert "La langue du document" in rank.PROMPT
+    assert "language (French or English) does not matter" in rank.PROMPT
 
 
 def test_openalex_completes_citations_and_pdf():
