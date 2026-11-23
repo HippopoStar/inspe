@@ -39,7 +39,7 @@ Pi lance une seule commande (`search_manager.py review`, voir [SKILL.md](pi/conf
    puis retrouve par leur titre dans OpenAlex les notices pertinentes sans DOI (ERIC), pour leurs citations ;
    puis ajoute (`--snowball`, 10 au plus) les travaux cités par au moins 3 notices pertinentes, qu'il note à leur tour : ce sont souvent les classiques du sujet, et la colonne « Ajouté car » du tableau dit par combien de notices ils sont cités ;
 5. retient les 20 mieux classées de pertinence ≥ 2 (`--top`, `--min-relevance`) ;
-6. écrit dans `workspace/AAAA-MM-JJ_HH-MM_<thème>/` (une recherche n'écrase jamais la précédente). Aucun PDF n'est téléchargé : seuls les liens sont donnés.
+6. écrit dans `workspace/AAAA-MM-JJ_HH-MM_<thème>/` (le thème est le premier terme de `--core` ; une recherche n'écrase jamais la précédente). Aucun PDF n'est téléchargé : seuls les liens sont donnés.
 
 | Fichier | Contenu |
 |---|---|

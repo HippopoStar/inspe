@@ -60,6 +60,7 @@
 
 **Code**
 - Une étape par module : `search`, `rank`, `enrich` (après la notation), `export`. L'ordre des étapes de `review` est vérifié par un test : la recherche par titre fournit les DOI dont la boule de neige a besoin.
+- Moins de choses à écrire pour le petit modèle : le dossier est dérivé du premier terme de `--core` (`--dir` reste possible) au lieu d'être nommé par l'agent, qui y avait mis une date inventée ; `SKILL.md` perd environ 30 % de ses mots (un seul exemple, règles fusionnées, options rares en une ligne). Au 3e essai le modèle avait déjà rempli toute la commande du premier coup (205 tokens, 2 709 de contexte sur 8 192).
 - Les tests remplacent les fonctions réseau avec `unittest.mock.patch`, qui les remet en place à la fin de chaque test.
 - Format de notice commun (`records.py`) et accès réseau partagé (`net.py`).
 - Un module par base, plus un registre.

@@ -18,6 +18,9 @@ import export
 import rank
 import search
 from providers import SOURCES, NOT_INTEGRATED, available, status
+from records import ascii_slug
+
+WORKSPACE = "/workspace"   # montage du conteneur Pi (compose.yml)
 
 
 def load(theme_dir: str) -> list:
@@ -33,14 +36,19 @@ def save(theme_dir: str, records: list):
 
 def dated(path: str) -> str:
     """/workspace/x -> /workspace/2026-11-23_20-14_x : une recherche n'écrase jamais la précédente.
-    Les chiffres en tête du nom sont retirés : le modèle y a mis une date inventée (20240405_peer_learning)."""
+    Une date en tête du nom est retirée : le modèle en a inventé une (20240405_peer_learning)."""
     head, name = os.path.split(os.path.normpath(path))
-    name = re.sub(r"^[\d_-]+", "", name) or "recherche"
+    name = re.sub(r"^\d{4,}[\d-]*_+", "", name) or "recherche"
     return os.path.join(head, f"{datetime.now():%Y-%m-%d_%H-%M}_{name}")
 
 
+def review_dir(a) -> str:
+    """--dir s'il est donné ; sinon /workspace/<premier terme de --core>, daté : l'agent n'a pas à nommer le dossier."""
+    return dated(a.dir or os.path.join(WORKSPACE, ascii_slug(a.core[0], 30).lower()))
+
+
 def cmd_review(a):
-    a.dir = dated(a.dir)
+    a.dir = review_dir(a)
     # Requêtes FR et EN obligatoires, sans filtre de langue : les deux langues conviennent toujours.
     queries = a.fr + a.en
     topic, scorer = a.topic or " / ".join(queries), rank.ollama_scorer(a.model)
@@ -98,8 +106,8 @@ def build_parser():
     def command(name, fn, help_):
         p = sub.add_parser(name, help=help_)
         p.set_defaults(fn=fn)
-        if name != "sources":
-            p.add_argument("--dir", required=True, help="dossier du thème, ex. /workspace/mon_theme")
+        if name != "sources":   # `review` le dérive de --core quand il manque
+            p.add_argument("--dir", required=name != "review", help="dossier du thème, ex. /workspace/mon_theme")
         return p
 
     def search_options(p):

@@ -201,13 +201,25 @@ def test_review_steps_run_in_order():
     assert calls == ["scorer", "search", "grade", "by_title", "snowball", "grade", "write"]
 
 
-def test_review_folder_is_dated():
+def test_review_folder_is_dated_and_derived_from_core():
     import re
-    pattern = r"/workspace/\d{4}-\d\d-\d\d_\d\d-\d\d_peer_learning"
-    for path in ("/workspace/peer_learning/", "/workspace/20240405_peer_learning"):   # date inventée par le modèle : retirée
-        out = search_manager.dated(path)
-        assert re.fullmatch(pattern, out.replace(os.sep, "/")), out
-    assert search_manager.dated("/workspace/2024").endswith("_recherche")
+    parser = search_manager.build_parser()
+    stamped = lambda name: r"/workspace/\d{4}-\d\d-\d\d_\d\d-\d\d_" + name
+    norm = lambda path: path.replace(os.sep, "/")
+    for path in ("/workspace/peer_learning/", "/workspace/20240405_peer_learning", "/workspace/2024-04-05_peer_learning"):
+        assert re.fullmatch(stamped("peer_learning"), norm(search_manager.dated(path))), path   # date inventée : retirée
+    assert re.fullmatch(stamped("3D_printing"), norm(search_manager.dated("/workspace/3D_printing")))   # un vrai nom reste
+    # Sans --dir, le dossier vient du premier terme de --core : l'agent n'a plus à le nommer.
+    args = parser.parse_args(["review", "--fr", "a", "--en", "b", "--core", "Peer Learning", "peer tutoring"])
+    assert re.fullmatch(stamped("peer_learning"), norm(search_manager.review_dir(args)))
+    args = parser.parse_args(["review", "--dir", "/data/x", "--fr", "a", "--en", "b", "--core", "c"])
+    assert re.fullmatch(r"/data/\d{4}-\d\d-\d\d_\d\d-\d\d_x", norm(search_manager.review_dir(args)))     # --dir l'emporte
+    with contextlib.redirect_stderr(io.StringIO()):
+        try:
+            parser.parse_args(["export"])
+            raise AssertionError("--dir devrait rester obligatoire hors review")
+        except SystemExit:
+            pass
 
 
 def test_sources_quoted_or_not():
