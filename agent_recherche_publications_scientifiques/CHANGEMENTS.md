@@ -36,6 +36,7 @@
 **Classement**
 - Ordre : pertinence 0-3, puis percentile de citations OpenAlex (corrigé de l'âge et du domaine), puis citations brutes.
 - Les citations viennent toutes d'OpenAlex : des chiffres de bases différentes ne sont pas comparables.
+- Une notice sans résumé est notée 2 au plus : sur le titre seul, le modèle donnait 3 à des textes hors sujet.
 - Seules les 20 mieux classées sont retenues (`--top`), et la commande n'affiche qu'un résumé. Toute sa sortie revient dans le contexte 8k de l'agent : au premier essai, 223 lignes l'avaient fait dérailler.
 
 **Zotero**
@@ -77,6 +78,14 @@
 | Pascal et Francis | non intégrée | archive figée (1972-2015) sans API |
 | EBSCO | non intégrée | API réservée aux établissements abonnés |
 | Sci-Hub, Open-Slum | exclues | violation du droit d'auteur ; Open-Slum ne fait que surveiller ces sites. Remplacées par les PDF légaux d'OpenAlex/Unpaywall |
+
+## Essais sur le HP Victus (23/11, peer learning)
+
+| | Essai 1 (`qwen3:4b`) | Essai 2 (`qwen3:4b-instruct`) |
+|---|---|---|
+| Durée totale | 19 min, dont 10 de réflexion | 6 min, sans réflexion |
+| Retenues | 223 / 302 | 20 / 188 (21 notées 3, 59 notées 2) |
+| Réponse finale | hors sujet (contexte débordé) | correcte, mais 100 s à recopier le tableau |
 
 ## Tests réels (sans clé, sans Ollama)
 

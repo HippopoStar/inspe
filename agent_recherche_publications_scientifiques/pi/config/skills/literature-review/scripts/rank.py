@@ -60,7 +60,10 @@ def sort_key(rec: dict):
 def rank(records: list, topic: str, scorer) -> list:
     for i, rec in enumerate(records, 1):
         try:
-            rec["relevance"] = scorer(topic, rec)
+            score = scorer(topic, rec)
+            # ponytail: sans résumé, le titre seul ne suffit pas pour « au cœur du sujet » (2e essai : 5 notices
+            # Cairn sans résumé et hors sujet notées 3). Plafond à 2 ; à revoir si une base fournit le texte intégral.
+            rec["relevance"] = min(score, 2) if score is not None and not rec["abstract"] else score
         except Exception as e:
             rec["relevance"] = None
             print(f"[rank] {rec['id']} : échec ({e})")

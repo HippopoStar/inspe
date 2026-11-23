@@ -41,14 +41,15 @@ def test_parse_score():
 
 
 def test_rank_order_and_selection():
-    records = [rec("hal", "a", "A"), rec("hal", "b", "B", cited_by=500, citation_percentile=0.99),
-               rec("hal", "c", "C", cited_by=3, citation_percentile=0.2), rec("hal", "d", "D")]
-    scores = {"A": 3, "B": 2, "C": 3, "D": None}
+    records = [rec("hal", "a", "A", abstract="r"), rec("hal", "b", "B", abstract="r", cited_by=500, citation_percentile=0.99),
+               rec("hal", "c", "C", abstract="r", cited_by=3, citation_percentile=0.2), rec("hal", "d", "D"),
+               rec("cairn", "e", "E")]  # E : sans résumé, 3 plafonné à 2
+    scores = {"A": 3, "B": 2, "C": 3, "D": None, "E": 3}
     with contextlib.redirect_stdout(io.StringIO()) as out:
         ranked = rank.rank(records, "sujet", lambda topic, r: scores[r["title"]])
-    assert out.getvalue().splitlines() == ["[rank] 4/4 notées", "[rank] notes : 3 = 2, 2 = 1, 1 = 0, 0 = 0"]
-    assert [r["title"] for r in ranked] == ["C", "A", "B", "D"]
-    assert [r["title"] for r in rank.selected(ranked, 2)] == ["C", "A", "B"]
+    assert out.getvalue().splitlines() == ["[rank] 5/5 notées", "[rank] notes : 3 = 2, 2 = 2, 1 = 0, 0 = 0"]
+    assert [r["title"] for r in ranked] == ["C", "A", "B", "E", "D"]
+    assert [r["title"] for r in rank.selected(ranked, 2)] == ["C", "A", "B", "E"]
     assert [r["title"] for r in rank.selected(ranked, 2, top=2)] == ["C", "A"]
     assert "language (French or English) does not matter" in rank.PROMPT
 
