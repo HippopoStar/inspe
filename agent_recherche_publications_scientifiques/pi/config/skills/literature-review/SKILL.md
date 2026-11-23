@@ -15,10 +15,11 @@ description: Builds a selection of scientific publications on a topic (HAL, TEL,
 - `--topic`: the user's subject in one sentence.
 - `--fr`: 2 or 3 short keyword queries in French (not the user's sentence).
 - `--en`: the same ideas in English, 2 or 3 queries.
-  Example for "méthodes pour enseigner l'informatique":
-  `--fr "didactique de l'informatique" "enseignement de la programmation" "pensée informatique école"`
-  `--en "computing education pedagogy" "teaching programming novices"`
-- `--sources` by field (databases whose key is missing are skipped automatically):
+- **Every query must contain the topic's core concept.** A query made only of generic words ("études comparatives", "pedagogical process") brings back off-topic results.
+  Example for "études comparatives sur le peer learning":
+  `--fr "apprentissage entre pairs" "apprentissage par les pairs comparaison" "tutorat entre pairs efficacité"`
+  `--en "peer learning comparative study" "peer tutoring effectiveness" "peer instruction versus lecture"`
+- `--sources`: space-separated names, without quotes, chosen by field (databases whose key is missing are skipped automatically):
   * Humanities / social sciences, French-speaking: `hal tel dumas cairn persee openedition openalex`
   * Education: `hal tel dumas eric cairn openalex`
   * Computer science / hard sciences: `openalex semanticscholar core springer scopus wos`
@@ -42,5 +43,5 @@ Copy the table printed at the end exactly as is (every row), then tell the user,
 - `/workspace/<folder>/pdfs/` is to be uploaded to an Open WebUI Knowledge collection;
 - PDFs marked `[lien]` must be downloaded by hand (HAL blocks robots).
 
-If the user wants more or fewer results, run again with `--max-results` (default 10) or `--min-relevance` (default 2).
+The selection keeps the 20 best results. If the user wants more or fewer, run again with `--top` (default 20) or `--min-relevance` (default 2).
 To see which databases are accessible: `search_manager.py sources --check`.
