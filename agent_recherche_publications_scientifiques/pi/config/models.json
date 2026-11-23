@@ -10,20 +10,11 @@
       },
       "models": [
         {
-          "id": "qwen2.5-coder:3b",
-          "name": "Qwen 2.5 Coder 3B (Code & Scripts)",
+          "id": "qwen3:4b",
+          "name": "Qwen 3 4B (défaut, réflexion désactivée)",
           "reasoning": false,
           "input": ["text"],
-          "contextWindow": 16384,
-          "maxTokens": 2048,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "qwen3:4b",
-          "name": "Qwen 3 4B (Raisonnement)",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 16384,
+          "contextWindow": 8192,
           "maxTokens": 2048,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         },
@@ -32,7 +23,7 @@
           "name": "Gemma 4 Edge 2B (Synthèse & Multilingue)",
           "reasoning": false,
           "input": ["text"],
-          "contextWindow": 16384,
+          "contextWindow": 8192,
           "maxTokens": 2048,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         },
@@ -41,7 +32,7 @@
           "name": "Phi-4 Mini 3.8B (Raisonnement & Analyse)",
           "reasoning": false,
           "input": ["text"],
-          "contextWindow": 16384,
+          "contextWindow": 8192,
           "maxTokens": 2048,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         },
@@ -50,7 +41,7 @@
           "name": "Ministral 3 3B (Synthèse Français)",
           "reasoning": false,
           "input": ["text"],
-          "contextWindow": 16384,
+          "contextWindow": 8192,
           "maxTokens": 2048,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         }

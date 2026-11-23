@@ -13,9 +13,10 @@ services:
       - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_KEEP_ALIVE=5m
       - OLLAMA_FLASH_ATTENTION=1
-      # Force une fenêtre de contexte de 8k tokens et compresse le cache KV pour tenir dans 4 Go de VRAM
-      - OLLAMA_CONTEXT_LENGTH=16384
-      - OLLAMA_KV_CACHE_TYPE=q4_0
+      # Contexte de 8k tokens + cache KV q8_0 : un modèle 4B tient entièrement dans les 4 Go de VRAM
+      # (16k + q4_0 débordait sur le CPU et dégradait la qualité). Vérifier avec : docker exec ollama ollama ps
+      - OLLAMA_CONTEXT_LENGTH=8192
+      - OLLAMA_KV_CACHE_TYPE=q8_0
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -49,6 +50,9 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       # Force l'embedding RAG sur CPU pour préserver les 4 Go de VRAM pour le LLM
       - RAG_EMBEDDING_ENGINE=
+      # Modèle d'embedding multilingue (le défaut all-MiniLM-L6-v2 ne gère que l'anglais).
+      # Après un changement : Admin > Paramètres > Documents > réindexer.
+      - RAG_EMBEDDING_MODEL=BAAI/bge-m3
       - USE_CUDA_DOCKER=false
       - ENABLE_OLLAMA_API=true
       - ENABLE_OPENAI_API=false
@@ -84,7 +88,12 @@ services:
       - ./pi/config/skills:/home/node/.pi/agent/skills:ro
       - ./pi/config/sessions:/home/node/.pi/agent/sessions
     environment:
-      - OLLAMA_BASE_URL=http://ollama:11434/v1
+      # Utilisé par search_manager.py rank (API native Ollama, sans « réflexion »)
+      - OLLAMA_HOST=http://ollama:11434
+      - RANK_MODEL=${RANK_MODEL:-qwen3:4b}
+      # Clés gratuites, à mettre dans un fichier .env à côté de compose.yml (voir README)
+      - OPENALEX_API_KEY=${OPENALEX_API_KEY:-}
+      - S2_API_KEY=${S2_API_KEY:-}
     security_opt:
       - no-new-privileges:true
     depends_on:

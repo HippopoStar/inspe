@@ -11,11 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir \
-    requests \
-    beautifulsoup4 \
-    pypdf \
-    arxiv
+RUN pip install --no-cache-dir requests
 
 # Préparation des répertoires pour l'utilisateur non-privilégié 'node' (UID 1000)
 RUN mkdir -p /home/node/.npm-global /home/node/.pi/agent/skills /home/node/.pi/agent/sessions /workspace \

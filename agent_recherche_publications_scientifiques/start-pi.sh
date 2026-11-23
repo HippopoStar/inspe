@@ -50,14 +50,12 @@ CHOICE=$($UI_TOOL --title "Agent Pi — Sélection dynamique du modèle" \
     --menu "Modèles chargés depuis pi/config/models.json :" \
     "$MENU_HEIGHT" 74 "$NUM_MODELS" \
     "${MENU_ITEMS[@]}" \
-    3>&1 1>&2 2>&3)
-
-# Si l'utilisateur appuie sur Annuler / Échap
-if [ $? -ne 0 ]; then
+    3>&1 1>&2 2>&3) || {
+    # Annuler / Échap (avec set -e, un test de $? après coup n'est jamais atteint)
     clear
     echo "Lancement annulé."
     exit 0
-fi
+}
 
 clear
 echo "🚀 Démarrage de l'agent Pi avec : $CHOICE"
