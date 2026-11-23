@@ -1,7 +1,7 @@
 """OpenAlex : recherche, et source unique des citations et des PDF légaux (données Unpaywall incluses).
 Clé gratuite exigée depuis février 2026 (openalex.org/settings/api) ; sans clé, quota très réduit."""
 from net import HTTP, secret
-from records import make_record, normalize_doi
+from records import make_record, normalize_doi, normalize_title
 
 URL = "https://api.openalex.org/works"
 TYPES = {"article": "JOUR", "review": "JOUR", "preprint": "JOUR", "letter": "JOUR", "editorial": "JOUR",
@@ -52,13 +52,30 @@ def search(query: str, max_results: int, lang: str = None) -> list:
     return [_record(w) for w in _get(**params)]
 
 
+def _phrase(text: str) -> str:
+    """Expression utilisable dans un filtre : guillemets, virgules et barres y séparent les valeurs."""
+    return " ".join(text.replace('"', " ").replace(",", " ").replace("|", " ").split())
+
+
 def most_cited(phrase: str, max_results: int) -> list:
     """Les travaux les plus cités dont le titre contient l'expression exacte : les classiques du sujet.
     Le titre est exigé : trier la recherche plein texte par citations ramène des articles sans rapport
     (PRISMA, NumPy pour « peer learning »)."""
-    phrase = " ".join(phrase.replace('"', " ").replace(",", " ").replace("|", " ").split())
-    return [_record(w) for w in _get(filter=f'title.search:"{phrase}"', sort="cited_by_count:desc",
+    return [_record(w) for w in _get(filter=f'title.search:"{_phrase(phrase)}"', sort="cited_by_count:desc",
                                      **{"per-page": max_results})]
+
+
+def find_by_title(title: str, year: str):
+    """La notice OpenAlex de même titre (à la ponctuation près) et d'année à ±1, sinon None. Pour les notices
+    sans DOI (ERIC) : sans cela, elles n'ont ni citations ni percentile.
+    # ponytail: titre exact et année ±1 ; les titres bilingues ou traduits (ERIC) ne sont pas retrouvés
+    # (31 notices sur 35 au 3e essai). Élargir avec une comparaison approchée si cela devient gênant."""
+    for w in _get(filter=f'title.search:"{_phrase(title)[:200]}"', **{"per-page": 5}):
+        found = _record(w)
+        years = int(found["year"]), int(year)
+        if normalize_title(found["title"]) == normalize_title(title) and (0 in years or abs(years[0] - years[1]) <= 1):
+            return found
+    return None
 
 
 def _wid(url: str) -> str:

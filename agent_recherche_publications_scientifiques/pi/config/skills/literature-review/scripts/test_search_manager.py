@@ -43,19 +43,20 @@ def test_parse_score():
 def test_rank_order_and_selection():
     records = [rec("hal", "a", "A", abstract="r"), rec("hal", "b", "B", abstract="r", cited_by=500, citation_percentile=0.99),
                rec("hal", "c", "C", abstract="r", cited_by=3, citation_percentile=0.2), rec("hal", "d", "D"),
-               rec("cairn", "e", "E")]  # E : sans résumé, 3 plafonné à 2
-    scores = {"A": 3, "B": 2, "C": 3, "D": None, "E": 3}
+               rec("cairn", "e", "E"),   # E : sans résumé, 3 plafonné à 2
+               rec("cairn", "f", "F", abstract="r", cited_by=1, citation_percentile=0.0)]   # F : 0 % mesuré
+    scores = {"A": 3, "B": 2, "C": 3, "D": None, "E": 3, "F": 3}
     with contextlib.redirect_stdout(io.StringIO()) as out:
         ranked = rank.rank(records, "sujet", lambda topic, r: scores[r["title"]])
-    assert out.getvalue().splitlines() == ["[rank] 5/5 notées", "[rank] notes : 3 = 2, 2 = 2, 1 = 0, 0 = 0"]
-    # Poids 1 par défaut : une 2 ne passe jamais une 3 (B : 2 + 0,99 < A : 3) ; à note égale, le percentile départage.
-    # Sans résumé, E est plafonné à 2.
-    assert [r["title"] for r in ranked] == ["C", "A", "B", "E", "D"]
-    assert [r["title"] for r in rank.selected(ranked, 2)] == ["C", "A", "B", "E"]
-    assert [r["title"] for r in rank.selected(ranked, 2, top=2)] == ["C", "A"]
-    with contextlib.redirect_stdout(io.StringIO()):   # poids 2 : B (2 + 2 × 0,99) passe devant C (3 + 2 × 0,2) et A
+    assert out.getvalue().splitlines() == ["[rank] 6/6 notées", "[rank] notes : 3 = 3, 2 = 2, 1 = 0, 0 = 0"]
+    # Poids 1 par défaut, percentile inconnu = 0,5 : A (3 + 0,5) devant C (3 + 0,2) et F (3 + 0 mesuré) ;
+    # une 2 ne passe jamais une 3 mesurée (B : 2 + 0,99 < F : 3) ; sans résumé, E est plafonné à 2.
+    assert [r["title"] for r in ranked] == ["A", "C", "F", "B", "E", "D"]
+    assert [r["title"] for r in rank.selected(ranked, 2)] == ["A", "C", "F", "B", "E"]
+    assert [r["title"] for r in rank.selected(ranked, 2, top=2)] == ["A", "C"]
+    with contextlib.redirect_stdout(io.StringIO()):   # poids 2 : B (2 + 2 × 0,99) passe devant C (3 + 2 × 0,2)
         by_citations = rank.rank(records, "sujet", lambda topic, r: scores[r["title"]], citation_weight=2)
-    assert [r["title"] for r in by_citations] == ["B", "C", "A", "E", "D"]
+    assert [r["title"] for r in by_citations] == ["A", "B", "C", "F", "E", "D"]
     assert "language (French or English) does not matter" in rank.PROMPT
 
 
@@ -162,10 +163,41 @@ def test_snowball_adds_works_cited_by_relevant_results():
     assert snowball.snowball([c], 2, 10) == []                                    # aucune notice pertinente
 
 
+def test_title_lookup_completes_records_without_doi():
+    a = rec("eric", "EJ1", "Peer Tutoring.", abstract="r"); a["relevance"] = 3     # pertinente, sans DOI : cherchée
+    b = rec("eric", "EJ2", "Hors sujet"); b["relevance"] = 0                       # non pertinente : aucune requête
+    c = rec("eric", "EJ3", "Inconnue", abstract="r"); c["relevance"] = 2           # pertinente, absente d'OpenAlex
+    d = rec("cairn", "x", "Avec DOI", doi="10.1/d"); d["relevance"] = 3            # a un DOI : déjà traitée
+    asked = []
+    search.find_by_title = lambda title, year: asked.append(title) or (
+        rec("openalex", "W1", title, doi="10.1/pt", cited_by=45, citation_percentile=0.89) if title == "Peer Tutoring." else None)
+    with contextlib.redirect_stdout(io.StringIO()):
+        search.complete_by_title([a, b, c, d], 2)
+    assert asked == ["Peer Tutoring.", "Inconnue"]
+    assert (a["doi"], a["cited_by"], a["citation_percentile"]) == ("10.1/pt", 45, 0.89)
+    assert c["cited_by"] is None and c["doi"] == ""
+
+
+def test_find_by_title_needs_same_title_and_close_year():
+    from providers import openalex
+    work = lambda title, year: {"id": "https://openalex.org/W1", "title": title, "publication_year": year, "authorships": []}
+    old = openalex._get
+    openalex._get = lambda **params: [work("Another paper", 1988), work("Peer tutoring as a teaching strategy", 1989)]
+    try:
+        assert openalex.find_by_title("Peer Tutoring as a Teaching Strategy.", "1988")["id"] == "openalex:W1"  # ±1 an
+        assert openalex.find_by_title("Peer Tutoring as a Teaching Strategy.", "1995") is None                 # année trop loin
+        assert openalex.find_by_title("Peer Tutoring", "1989") is None                                         # autre titre
+    finally:
+        openalex._get = old
+
+
 def test_review_folder_is_dated():
     import re
-    out = search_manager.dated("/workspace/peer_learning/")
-    assert re.fullmatch(r"/workspace/\d{4}-\d\d-\d\d_\d\d-\d\d_peer_learning", out.replace(os.sep, "/")), out
+    pattern = r"/workspace/\d{4}-\d\d-\d\d_\d\d-\d\d_peer_learning"
+    for path in ("/workspace/peer_learning/", "/workspace/20240405_peer_learning"):   # date inventée par le modèle : retirée
+        out = search_manager.dated(path)
+        assert re.fullmatch(pattern, out.replace(os.sep, "/")), out
+    assert search_manager.dated("/workspace/2024").endswith("_recherche")
 
 
 def test_sources_quoted_or_not():

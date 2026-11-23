@@ -7,6 +7,7 @@ metadata.json (toutes les notices), selection.ris (import Zotero), SELECTION.md 
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime
 
@@ -31,8 +32,10 @@ def save(theme_dir: str, records: list):
 
 
 def dated(path: str) -> str:
-    """/workspace/x -> /workspace/2026-11-23_20-14_x : une recherche n'écrase jamais la précédente."""
+    """/workspace/x -> /workspace/2026-11-23_20-14_x : une recherche n'écrase jamais la précédente.
+    Les chiffres en tête du nom sont retirés : le modèle y a mis une date inventée (20240405_peer_learning)."""
     head, name = os.path.split(os.path.normpath(path))
+    name = re.sub(r"^[\d_-]+", "", name) or "recherche"
     return os.path.join(head, f"{datetime.now():%Y-%m-%d_%H-%M}_{name}")
 
 
@@ -43,6 +46,7 @@ def cmd_review(a):
     topic, scorer = a.topic or " / ".join(queries), rank.ollama_scorer(a.model)
     records = search.search(queries, a.sources, a.max_results, core=a.core)
     rank.grade(records, topic, scorer)
+    search.complete_by_title(records, a.min_relevance)   # ERIC : ni DOI ni citations sans cette étape
     added = snowball.snowball(records, a.min_relevance, a.snowball)   # classiques cités par les notices pertinentes
     rank.grade(added, topic, scorer)
     records = rank.order(records + added, a.citation_weight)

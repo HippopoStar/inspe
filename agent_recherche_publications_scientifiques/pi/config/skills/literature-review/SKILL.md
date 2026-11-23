@@ -11,7 +11,7 @@ description: Builds a selection of scientific publications on a topic (HAL, TEL,
 
 ## 1. Prepare the command (no long thinking)
 
-- `<folder>`: 2 or 3 words from the user's topic, lowercase, joined by `_` (the command adds the date and time in front). Never reuse a name from an example.
+- `<folder>`: 2 or 3 words from the user's topic, lowercase letters only, joined by `_`, for example `peer_learning`. No digits and no date: the command adds the date and time in front. Never reuse a name from an example.
 - `--topic`: the user's subject in one sentence.
 - `--fr`: 2 or 3 keyword queries in French (not the user's sentence).
 - `--en`: the same ideas in English, 2 or 3 queries.

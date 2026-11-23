@@ -8,6 +8,7 @@ import requests
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
 RANK_MODEL = os.environ.get("RANK_MODEL", "qwen3:4b-instruct")
 CITATION_WEIGHT = 1.0   # voir sort_key ; 0 = classement par pertinence seule
+UNKNOWN_PERCENTILE = 0.5
 LABELS = {0: "hors sujet", 1: "lien indirect", 2: "pertinent", 3: "au cœur du sujet"}
 
 # En anglais : Qwen3 suit mieux des consignes en anglais. Barème strict : au premier essai, la quasi-totalité
@@ -58,10 +59,13 @@ def sort_key(rec: dict, citation_weight: float):
     la liste ; une 2 ne passe jamais devant une 3 (2 + 0,99 < 3). Au-delà de 1, une 2 très citée passe devant une 3 :
     au 2e essai, un poids 2 évinçait 13 des 15 notices notées 3, faute de percentile (ERIC sans DOI, articles récents).
     Le filtre `--min-relevance` reste appliqué avant : les citations ne font jamais entrer du hors-sujet.
-    Percentile inconnu = aucun bonus (pas une pénalité) ; non noté = en dernier."""
+    Percentile inconnu = 0,5, pas 0 : un percentile est réparti uniformément, c'est la valeur attendue quand on ne sait
+    rien. Avec 0, les bases sans DOI (ERIC) étaient classées sous toute notice mesurée, même peu citée ; un 0 mesuré
+    reste un vrai 0. Non noté = en dernier."""
     if rec.get("relevance") is None:
         return (-1, -1)
-    return (rec["relevance"] + citation_weight * (rec.get("citation_percentile") or 0), rec.get("cited_by") or 0)
+    pct = rec.get("citation_percentile")
+    return (rec["relevance"] + citation_weight * (UNKNOWN_PERCENTILE if pct is None else pct), rec.get("cited_by") or 0)
 
 
 def grade(records: list, topic: str, scorer):
