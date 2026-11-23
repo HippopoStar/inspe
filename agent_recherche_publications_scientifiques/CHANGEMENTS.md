@@ -59,7 +59,8 @@
 - `workspace/` et `pi/config/sessions/` sont ignorés par git.
 
 **Code**
-- Une étape par module : `search`, `rank`, `export`.
+- Une étape par module : `search`, `rank`, `enrich` (après la notation), `export`. L'ordre des étapes de `review` est vérifié par un test : la recherche par titre fournit les DOI dont la boule de neige a besoin.
+- Les tests remplacent les fonctions réseau avec `unittest.mock.patch`, qui les remet en place à la fin de chaque test.
 - Format de notice commun (`records.py`) et accès réseau partagé (`net.py`).
 - Un module par base, plus un registre.
 - Test hors ligne (`test_search_manager.py`).

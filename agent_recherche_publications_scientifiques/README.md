@@ -68,7 +68,7 @@ Limites :
 |---|---|
 | `search_manager.py` | ligne de commande : `review`, `search`, `rank`, `export`, `sources` |
 | `search.py` | étape 1 : bases -> notices, doublons, complément OpenAlex |
-| `snowball.py` | étape 1b : travaux cités par plusieurs notices pertinentes (références OpenAlex) |
+| `enrich.py` | étape 2b, après la notation : notices sans DOI retrouvées par leur titre, puis boule de neige (travaux cités par plusieurs notices pertinentes) |
 | `rank.py` | étape 2 : note de pertinence par le LLM, classement |
 | `export.py` | étape 3 : `selection.ris` et `SELECTION.md` |
 | `records.py` | format commun d'une notice, fusion des doublons |

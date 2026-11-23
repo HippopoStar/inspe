@@ -50,6 +50,7 @@ def make_record(source: str, doc_id: str, title: str, authors: list, year, abstr
         "pdf_url": pdf_url or "",
         "cited_by": cited_by,                        # None = inconnu, différent de 0
         "citation_percentile": citation_percentile,  # 0-1, corrigé de l'âge et du domaine (OpenAlex)
+        "cited_by_results": 0,                       # notices pertinentes de la liste qui la citent (enrich.snowball)
     }
 
 

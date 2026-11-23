@@ -1,7 +1,7 @@
 """Étape 1 : interroger les bases, fusionner les doublons, compléter citations et PDF via OpenAlex."""
 from providers import SOURCES, available, status
-from providers.openalex import find_by_title, lookup_dois, most_cited
-from records import deduplicate, fill_gaps
+from providers.openalex import lookup_dois, most_cited
+from records import deduplicate
 
 
 def usable_sources(names: list) -> list:
@@ -32,25 +32,6 @@ def complete_from_openalex(records: list):
                 rec["cited_by"], rec["citation_percentile"] = extra["cited_by"], extra["citation_percentile"]
             rec["pdf_url"] = rec["pdf_url"] or extra["pdf_url"]
     print(f"[openalex] {len(found)} notice(s) complétée(s) (citations, PDF en accès libre).")
-
-
-def complete_by_title(records: list, min_relevance: int):
-    """Notices pertinentes sans DOI (ERIC) : retrouvées dans OpenAlex par leur titre, pour leurs citations et leur DOI.
-    Appelée après la notation : une requête par notice, donc seulement pour celles qui peuvent être retenues.
-    # ponytail: requêtes séquentielles (~1,2 s chacune, 35 notices ≈ 45 s) ; à grouper si les recherches grossissent."""
-    todo = [r for r in records if (r.get("relevance") or 0) >= min_relevance
-            and not r["doi"] and r["citation_percentile"] is None]
-    found = 0
-    for rec in todo:
-        try:
-            match = find_by_title(rec["title"], rec["year"])
-        except Exception as e:
-            print(f"[openalex] recherche par titre interrompue : {str(e)[:160]}")
-            break
-        if match:
-            fill_gaps(rec, match)
-            found += 1
-    print(f"[openalex] {found}/{len(todo)} notice(s) pertinente(s) sans DOI retrouvée(s) par leur titre (citations, DOI).")
 
 
 def search(queries: list, sources: list, max_results: int, lang: str = None, core: list = ()) -> list:

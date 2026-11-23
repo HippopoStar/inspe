@@ -5,9 +5,11 @@ import io
 import os
 import sys
 import tempfile
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import enrich
 import export
 import net
 import providers
@@ -62,8 +64,8 @@ def test_rank_order_and_selection():
 
 def test_openalex_completes_citations_and_pdf():
     r = rec("cairn", "10.3917/x", "T", doi="10.3917/x", cited_by=4)
-    search.lookup_dois = lambda dois: {"10.3917/x": {"cited_by": 9, "citation_percentile": 0.5, "pdf_url": "https://oa/x.pdf"}}
-    with contextlib.redirect_stdout(io.StringIO()):
+    found = {"10.3917/x": {"cited_by": 9, "citation_percentile": 0.5, "pdf_url": "https://oa/x.pdf"}}
+    with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(search, "lookup_dois", return_value=found):
         search.complete_from_openalex([r])
     assert (r["cited_by"], r["citation_percentile"], r["pdf_url"]) == (9, 0.5, "https://oa/x.pdf")
 
@@ -122,45 +124,39 @@ def test_review_requires_both_languages():
 
 def test_core_terms_add_most_cited_by_title():
     from providers import openalex
-    calls = []
     work = {"id": "https://openalex.org/W1", "title": "Peer Learning and Assessment", "publication_year": 1999,
             "doi": "https://doi.org/10.1080/0260293990240405", "cited_by_count": 1423,
             "citation_normalized_percentile": {"value": 0.99}, "authorships": []}
-    old = openalex._get
-    openalex._get = lambda **params: calls.append(params) or [work]
-    try:
+    with mock.patch.object(openalex, "_get", return_value=[work]) as get:
         found = openalex.most_cited('peer "learning", x', 10)
-    finally:
-        openalex._get = old
     # Expression exacte dans le titre, triée par citations (guillemets et virgules de l'agent neutralisés).
-    assert calls == [{"filter": 'title.search:"peer learning x"', "sort": "cited_by_count:desc", "per-page": 10}]
+    get.assert_called_once_with(filter='title.search:"peer learning x"', sort="cited_by_count:desc", **{"per-page": 10})
     assert found[0]["cited_by"] == 1423 and found[0]["citation_percentile"] == 0.99
 
-    search.most_cited = lambda term, n: [rec("openalex", term, f"Classique {term}")]
-    search.lookup_dois = lambda dois: {}
-    with contextlib.redirect_stdout(io.StringIO()):
+    classics = lambda term, n: [rec("openalex", term, f"Classique {term}")]
+    with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(search, "most_cited", side_effect=classics), \
+            mock.patch.object(search, "lookup_dois", return_value={}):
         out = search.search([], [], 10, core=["peer learning", "peer tutoring"])
     assert [r["title"] for r in out] == ["Classique peer learning", "Classique peer tutoring"]
 
 
 def test_snowball_adds_works_cited_by_relevant_results():
-    import snowball
     a = rec("openalex", "W1", "A", abstract="r"); a["relevance"] = 3
     b = rec("hal", "b", "B", doi="10.1/b"); b["relevance"] = 2
     c = rec("openalex", "W3", "C"); c["relevance"] = 0                 # hors sujet : ne cite pas pour la liste
-    calls = []
     # A cite W9, W8 et W3 (déjà dans la liste) ; B (trouvée par DOI, id W2) cite W9, W8 et W7 ; C cite W7 mais est écartée.
-    snowball.openalex.references = lambda dois, ids: calls.append((dois, ids)) or [
-        ("W1", "", ["W9", "W8", "W3"]), ("W2", "10.1/b", ["W9", "W8", "W7"])]
-    snowball.openalex.works = lambda ids: [rec("openalex", w, f"Classique {w}", doi=d, cited_by=50, citation_percentile=0.9)
-                                           for w, d in (("W9", "10.9/x"), ("W8", "10.1/b"))]   # W8 = B, déjà dans la liste
-    with contextlib.redirect_stdout(io.StringIO()):
-        added = snowball.snowball([a, b, c], 2, 10, min_citers=2)
-        assert snowball.snowball([a, b, c], 2, 0) == []                           # --snowball 0 : désactivé
-    assert calls == [(["10.1/b"], ["W1"])]                                       # relevantes seulement, A par id
+    references = [("W1", "", ["W9", "W8", "W3"]), ("W2", "10.1/b", ["W9", "W8", "W7"])]
+    works = [rec("openalex", w, f"Classique {w}", doi=d, cited_by=50, citation_percentile=0.9)
+             for w, d in (("W9", "10.9/x"), ("W8", "10.1/b"))]   # W8 = B, déjà dans la liste
+    with contextlib.redirect_stdout(io.StringIO()), \
+            mock.patch.object(enrich.openalex, "references", return_value=references) as read_references, \
+            mock.patch.object(enrich.openalex, "works", return_value=works):
+        added = enrich.snowball([a, b, c], 2, 10, min_citers=2)
+        assert enrich.snowball([a, b, c], 2, 0) == []                             # --snowball 0 : désactivé
+        assert enrich.snowball([c], 2, 10) == []                                  # aucune notice pertinente
+    read_references.assert_called_once_with(["10.1/b"], ["W1"])                  # relevantes seulement, A par id
     assert [(r["id"], r["cited_by_results"]) for r in added] == [("openalex:W9", 2)]
     assert (b["cited_by"], b["citation_percentile"], b["cited_by_results"]) == (50, 0.9, 2)   # B complétée, pas dupliquée
-    assert snowball.snowball([c], 2, 10) == []                                    # aucune notice pertinente
 
 
 def test_title_lookup_completes_records_without_doi():
@@ -169,10 +165,13 @@ def test_title_lookup_completes_records_without_doi():
     c = rec("eric", "EJ3", "Inconnue", abstract="r"); c["relevance"] = 2           # pertinente, absente d'OpenAlex
     d = rec("cairn", "x", "Avec DOI", doi="10.1/d"); d["relevance"] = 3            # a un DOI : déjà traitée
     asked = []
-    search.find_by_title = lambda title, year: asked.append(title) or (
-        rec("openalex", "W1", title, doi="10.1/pt", cited_by=45, citation_percentile=0.89) if title == "Peer Tutoring." else None)
-    with contextlib.redirect_stdout(io.StringIO()):
-        search.complete_by_title([a, b, c, d], 2)
+
+    def lookup(title, year):
+        asked.append(title)
+        return rec("openalex", "W1", title, doi="10.1/pt", cited_by=45, citation_percentile=0.89) if title == "Peer Tutoring." else None
+
+    with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(enrich.openalex, "find_by_title", side_effect=lookup):
+        enrich.complete_by_title([a, b, c, d], 2)
     assert asked == ["Peer Tutoring.", "Inconnue"]
     assert (a["doi"], a["cited_by"], a["citation_percentile"]) == ("10.1/pt", 45, 0.89)
     assert c["cited_by"] is None and c["doi"] == ""
@@ -181,14 +180,25 @@ def test_title_lookup_completes_records_without_doi():
 def test_find_by_title_needs_same_title_and_close_year():
     from providers import openalex
     work = lambda title, year: {"id": "https://openalex.org/W1", "title": title, "publication_year": year, "authorships": []}
-    old = openalex._get
-    openalex._get = lambda **params: [work("Another paper", 1988), work("Peer tutoring as a teaching strategy", 1989)]
-    try:
+    found = [work("Another paper", 1988), work("Peer tutoring as a teaching strategy", 1989)]
+    with mock.patch.object(openalex, "_get", return_value=found):
         assert openalex.find_by_title("Peer Tutoring as a Teaching Strategy.", "1988")["id"] == "openalex:W1"  # ±1 an
         assert openalex.find_by_title("Peer Tutoring as a Teaching Strategy.", "1995") is None                 # année trop loin
         assert openalex.find_by_title("Peer Tutoring", "1989") is None                                         # autre titre
-    finally:
-        openalex._get = old
+
+
+def test_review_steps_run_in_order():
+    """La recherche par titre fournit les DOI dont la boule de neige a besoin : elle passe avant, et après la notation."""
+    calls = []
+    step = lambda name, result=None: mock.Mock(side_effect=lambda *a, **k: calls.append(name) or result)
+    with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()), \
+            mock.patch.object(rank, "ollama_scorer", step("scorer")), mock.patch.object(search, "search", step("search", [])), \
+            mock.patch.object(rank, "grade", step("grade")), mock.patch.object(enrich, "complete_by_title", step("by_title")), \
+            mock.patch.object(enrich, "snowball", step("snowball", [])), mock.patch.object(export, "write", step("write", "")):
+        args = search_manager.build_parser().parse_args(
+            ["review", "--dir", os.path.join(d, "x"), "--fr", "a", "--en", "b", "--core", "c"])
+        search_manager.cmd_review(args)
+    assert calls == ["scorer", "search", "grade", "by_title", "snowball", "grade", "write"]
 
 
 def test_review_folder_is_dated():

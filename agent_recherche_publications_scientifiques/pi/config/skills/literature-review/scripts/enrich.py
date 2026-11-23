@@ -1,11 +1,31 @@
-"""Étape 1b : « boule de neige ». Ajoute les travaux que citent plusieurs notices pertinentes : les classiques
-du sujet, que les requêtes manquent quand leur titre ne contient pas les mots cherchés."""
+"""Étape 2b : enrichir avec OpenAlex une fois les notices notées. Les deux fonctions ne s'adressent qu'aux
+notices pertinentes, d'où leur place après la notation : `complete_by_title` d'abord (elle fournit les DOI dont
+`snowball` a besoin pour lire les références des notices sans DOI), puis `snowball`."""
 from collections import Counter
 
 from providers import openalex
 from records import fill_gaps, match_keys
 
 MIN_CITERS = 3   # cité par au moins 3 notices pertinentes : un seul citeur ne fait pas un classique
+
+
+def complete_by_title(records: list, min_relevance: int):
+    """Notices pertinentes sans DOI (ERIC) : retrouvées dans OpenAlex par leur titre, pour leurs citations et leur DOI.
+    Une requête par notice, donc seulement pour celles qui peuvent être retenues.
+    # ponytail: requêtes séquentielles (~1,2 s chacune, 35 notices ≈ 45 s) ; à grouper si les recherches grossissent."""
+    todo = [r for r in records if (r.get("relevance") or 0) >= min_relevance
+            and not r["doi"] and r["citation_percentile"] is None]
+    found = 0
+    for rec in todo:
+        try:
+            match = openalex.find_by_title(rec["title"], rec["year"])
+        except Exception as e:
+            print(f"[openalex] recherche par titre interrompue : {str(e)[:160]}")
+            break
+        if match:
+            fill_gaps(rec, match)
+            found += 1
+    print(f"[openalex] {found}/{len(todo)} notice(s) pertinente(s) sans DOI retrouvée(s) par leur titre (citations, DOI).")
 
 
 def snowball(records: list, min_relevance: int, limit: int, min_citers: int = MIN_CITERS) -> list:

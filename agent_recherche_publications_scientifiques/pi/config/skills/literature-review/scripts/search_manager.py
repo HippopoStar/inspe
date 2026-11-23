@@ -13,10 +13,10 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import enrich
 import export
 import rank
 import search
-import snowball
 from providers import SOURCES, NOT_INTEGRATED, available, status
 
 
@@ -46,8 +46,8 @@ def cmd_review(a):
     topic, scorer = a.topic or " / ".join(queries), rank.ollama_scorer(a.model)
     records = search.search(queries, a.sources, a.max_results, core=a.core)
     rank.grade(records, topic, scorer)
-    search.complete_by_title(records, a.min_relevance)   # ERIC : ni DOI ni citations sans cette étape
-    added = snowball.snowball(records, a.min_relevance, a.snowball)   # classiques cités par les notices pertinentes
+    enrich.complete_by_title(records, a.min_relevance)   # ERIC : ni DOI ni citations sans cette étape
+    added = enrich.snowball(records, a.min_relevance, a.snowball)   # classiques cités par les notices pertinentes
     rank.grade(added, topic, scorer)
     records = rank.order(records + added, a.citation_weight)
     save(a.dir, records)
