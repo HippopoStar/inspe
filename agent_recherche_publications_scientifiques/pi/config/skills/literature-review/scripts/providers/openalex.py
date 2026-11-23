@@ -45,7 +45,8 @@ def _record(w: dict) -> dict:
     )
 
 
-def search(query: str, max_results: int, lang: str = None) -> list:
+def search(query: str, max_results: int, lang: str = None, boolean: bool = False) -> list:
+    """La recherche OpenAlex accepte déjà AND, OR et les guillemets : `boolean` ne change rien ici."""
     params = {"search": query, "per-page": max_results}
     if lang:
         params["filter"] = f"language:{lang}"

@@ -1,6 +1,7 @@
 """Étape 1 : interroger les bases, fusionner les doublons, compléter citations et PDF via OpenAlex."""
 from providers import SOURCES, available, status
 from providers.openalex import lookup_dois, most_cited
+from net import lucene_safe
 from records import deduplicate
 
 
@@ -34,17 +35,37 @@ def complete_from_openalex(records: list):
     print(f"[openalex] {len(found)} notice(s) complétée(s) (citations, PDF en accès libre).")
 
 
-def search(queries: list, sources: list, max_results: int, lang: str = None, core: list = ()) -> list:
-    raw = []
-    for source in usable_sources(sources):
+def equation(*blocks) -> str:
+    """« ("a" OR "b") AND ("c" OR "d") » : OR entre synonymes contre le silence, AND entre blocs contre le bruit.
+    Chaque terme est nettoyé puis mis entre guillemets : l'équation est sûre pour Solr (HAL, ERIC) et OpenAlex."""
+    return " AND ".join("(" + " OR ".join(f'"{lucene_safe(t)}"' for t in block) + ")" for block in blocks)
+
+
+def _ask(source: str, label: str, query: str, max_results: int, lang, **extra) -> list:
+    try:
+        found = SOURCES[source]["fn"](query, max_results, lang, **extra)
+        print(f"[{source}] {label} : {len(found)}")
+        return found
+    except Exception as e:
+        print(f"[{source}] erreur : {str(e)[:160]}")
+        return []
+
+
+def search(queries: list, sources: list, max_results: int, lang: str = None, core: list = (),
+           facet: list = ()) -> list:
+    raw, sources = [], usable_sources(sources)
+    for source in sources:
         for query in queries:
-            try:
-                extra = {"core": core} if SOURCES[source]["takes_core"] and core else {}
-                found = SOURCES[source]["fn"](query, max_results, lang, **extra)
-                print(f"[{source}] « {query} » : {len(found)}")
-                raw += found
-            except Exception as e:
-                print(f"[{source}] erreur : {str(e)[:160]}")
+            extra = {"core": core} if SOURCES[source]["takes_core"] and core else {}
+            raw += _ask(source, f"« {query} »", query, max_results, lang, **extra)
+    # Le type d'étude demandé (méta-analyses, études expérimentales…) : une équation (concepts) AND (type d'étude),
+    # dans les bases qui la comprennent. Les requêtes libres restent : l'équation seule manquerait les résumés
+    # qui ne nomment pas le type d'étude.
+    if core and facet:
+        eq = equation(core, facet)
+        for source in sources:
+            if SOURCES[source]["boolean"]:
+                raw += _ask(source, "équation concepts ET type d'étude", eq, max_results, lang, boolean=True)
     # Les requêtes précises ne ramènent pas les classiques (2e essai : Boud 1999, Topping absents) :
     # pour chaque concept central, les travaux les plus cités qui le portent dans leur titre.
     for term in core:

@@ -13,12 +13,14 @@ description: Builds a selection of scientific publications on a topic (HAL, TEL,
 
 - `--topic`: the user's subject in one sentence, with its context (level, method).
 - `--core`: **every concept the user names**, each in English and in French, 1 to 3 words each, at most 8 terms, nothing else (no "comparative", "study"). A publication must study one of them to get the top grade, and their most cited works are added: the classics.
+- `--facet`: only if the user asks for a type of study (meta-analyses, experimental studies, comparisons…): those types, in English and French, 1 to 2 words each. Publications must contain a concept AND a type; a publication of another type gets at most 2.
 - `--fr` and `--en`: 2 to 4 keyword queries in each language, not the user's sentence: **at least one per concept, 2 to 4 words each, with the concept in it**.
 - `--sources`: names separated by spaces, without quotes. Education: `hal tel dumas eric cairn openalex`. Humanities, French-speaking: `hal tel dumas cairn persee openedition openalex`. Sciences: `openalex semanticscholar core springer scopus wos`. Unsure: `all` (slower). A database whose key is missing is skipped.
 
-Example for "classe inversée et apprentissage par problèmes à l'université : effets sur la réussite" (2 concepts):
+Example for "classe inversée et apprentissage par problèmes à l'université : effets sur la réussite, études contrôlées" (2 concepts, 1 type of study):
 `--topic "Effects of the flipped classroom and problem-based learning on achievement in higher education"`
 `--core "flipped classroom" "classe inversée" "problem-based learning" "apprentissage par problèmes"`
+`--facet "controlled trial" "essai contrôlé" "control group" "groupe contrôle"`
 `--fr "classe inversée réussite" "apprentissage par problèmes université" --en "flipped classroom achievement" "problem-based learning effectiveness"`
 
 ## 2. Run it
@@ -27,6 +29,7 @@ Example for "classe inversée et apprentissage par problèmes à l'université :
 python3 /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py review \
   --topic "<subject in one sentence>" \
   --core "<concept 1>" "<concept 1 FR>" "<concept 2>" "<concept 2 FR>" \
+  --facet "<study type>" "<type d'étude>" \
   --fr "<requête 1>" "<requête 2>" \
   --en "<query 1>" "<query 2>" \
   --sources <sources>

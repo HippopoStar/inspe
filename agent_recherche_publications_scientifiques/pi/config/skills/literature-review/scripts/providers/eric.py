@@ -12,8 +12,9 @@ def _type(pub_types: list) -> str:
     return next((ris for label, ris in TYPES.items() if label in joined), "GEN")
 
 
-def search(query: str, max_results: int, lang: str = None) -> list:
-    r = HTTP.get(URL, timeout=20, params={"search": lucene_safe(query), "rows": max_results,
+def search(query: str, max_results: int, lang: str = None, boolean: bool = False) -> list:
+    """boolean : `query` est une équation déjà sûre (search.equation), passée telle quelle."""
+    r = HTTP.get(URL, timeout=20, params={"search": query if boolean else lucene_safe(query), "rows": max_results,
                                           "format": "json", "fields": FIELDS})
     r.raise_for_status()
     results = []

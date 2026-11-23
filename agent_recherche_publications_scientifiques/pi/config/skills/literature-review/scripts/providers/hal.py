@@ -11,9 +11,12 @@ FIELDS = ("halId_s,title_s,authFullName_s,producedDateY_i,abstract_s,fileMain_s,
 
 
 def search(query: str, max_results: int, lang: str = None, portal: str = "", source: str = "hal",
-           core: list = ()) -> list:
+           core: list = (), boolean: bool = False) -> list:
+    """boolean : `query` est une équation déjà sûre (search.equation), passée telle quelle."""
     params = {"q": f"({lucene_safe(query)})", "rows": max_results, "wt": "json", "fl": FIELDS}
-    if core:
+    if boolean:
+        params["q"] = query
+    elif core:
         # HAL exige tous les mots : au 5e essai, « peer learning comparative study traditional teaching » n'y trouvait
         # rien. Avec les concepts centraux, l'un d'eux (expression exacte) est exigé ; les mots de la requête classent.
         params["q"] = "+(" + " OR ".join(f'"{lucene_safe(t)}"' for t in core) + f") {lucene_safe(query)}"

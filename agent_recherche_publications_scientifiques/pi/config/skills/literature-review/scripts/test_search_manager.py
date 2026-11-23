@@ -175,6 +175,42 @@ def test_hal_requires_one_core_concept_not_every_word():
     eric_fn.assert_called_once_with("q", 10, None)
 
 
+def test_facet_equation_and_grading():
+    from providers import hal
+    eq = search.equation(["peer learning", 'tutorat "entre" pairs'], ["meta-analysis", "quasi-expérimental"])
+    assert eq == '("peer learning" OR "tutorat entre pairs") AND ("meta-analysis" OR "quasi-expérimental")'
+
+    # L'équation va, telle quelle, aux seules bases qui comprennent AND/OR ; les requêtes libres restent.
+    fns = {name: mock.Mock(return_value=[]) for name in ("hal", "eric", "cairn")}
+    with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(search, "most_cited", return_value=[]), \
+            contextlib.ExitStack() as stack:
+        for name, fn in fns.items():
+            stack.enter_context(mock.patch.dict(providers.SOURCES[name], fn=fn))
+        search.search(["q"], ["hal", "eric", "cairn"], 10, core=["peer learning"], facet=["meta-analysis"])
+    eq = '("peer learning") AND ("meta-analysis")'
+    assert fns["eric"].call_args_list == [mock.call("q", 10, None), mock.call(eq, 10, None, boolean=True)]
+    assert fns["hal"].call_args_list[-1] == mock.call(eq, 10, None, boolean=True)
+    assert fns["cairn"].call_args_list == [mock.call("q", 10, None)]
+
+    reply = mock.Mock()
+    reply.json.return_value = {"response": {"docs": []}}
+    with mock.patch.object(hal.HTTP, "get", return_value=reply) as get:
+        hal.search(eq, 10, core=["x"], boolean=True)
+    assert get.call_args.kwargs["params"]["q"] == eq and "q.op" not in get.call_args.kwargs["params"]
+
+    # Le correcteur reçoit le type d'étude : un ouvrage ou une revue générale n'a plus 3.
+    grade = mock.Mock()
+    with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()), \
+            mock.patch.object(rank, "ollama_scorer"), mock.patch.object(search, "search", return_value=[]) as found, \
+            mock.patch.object(rank, "grade", grade), mock.patch.object(enrich, "complete_by_title"), \
+            mock.patch.object(enrich, "snowball", return_value=[]), mock.patch.object(export, "write", return_value=""):
+        search_manager.cmd_review(search_manager.build_parser().parse_args(
+            ["review", "--dir", os.path.join(d, "x"), "--fr", "a", "--en", "b", "--core", "peer learning",
+             "--facet", "meta-analysis", "méta-analyse"]))
+    assert "Study types (a 3 must also be one of them): meta-analysis / méta-analyse" in grade.call_args.args[1]
+    assert found.call_args.kwargs["facet"] == ["meta-analysis", "méta-analyse"]
+
+
 def test_snowball_adds_works_cited_by_relevant_results():
     a = rec("openalex", "W1", "A", abstract="r"); a["relevance"] = 3
     b = rec("hal", "b", "B", doi="10.1/b"); b["relevance"] = 2

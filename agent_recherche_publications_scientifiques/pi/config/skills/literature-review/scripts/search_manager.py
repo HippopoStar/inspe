@@ -54,8 +54,10 @@ def cmd_review(a):
     # Le correcteur ne voit que ce texte : au 4e essai, « vs traditional teaching » dans le sujet faisait noter 3 des
     # articles sur l'enseignement traditionnel. Le concept central (--core) lui dit ce qu'un 3 doit étudier.
     topic = (a.topic or " / ".join(queries)) + f"\nCore concepts (a 3 must study one of them): {' / '.join(a.core)}"
+    if a.facet:   # le type d'étude demandé : sans lui, des ouvrages et revues générales recevaient 3
+        topic += f"\nStudy types (a 3 must also be one of them): {' / '.join(a.facet)}"
     scorer = rank.ollama_scorer(a.model)
-    records = search.search(queries, a.sources, a.max_results, core=a.core)
+    records = search.search(queries, a.sources, a.max_results, core=a.core, facet=a.facet)
     rank.grade(records, topic, scorer)
     enrich.complete_by_title(records, a.min_relevance)   # ERIC : ni DOI ni citations sans cette étape
     added = enrich.snowball(records, a.min_relevance, a.snowball)   # classiques cités par les notices pertinentes
@@ -134,6 +136,8 @@ def build_parser():
     p.add_argument("--core", nargs="+", required=True,
                    help="chaque concept nommé par l'utilisateur, FR et EN, 1 à 3 mots chacun : leurs travaux les plus cités "
                         "sont ajoutés, HAL/TEL/DUMAS en exigent un")
+    p.add_argument("--facet", nargs="+", default=[],
+                   help="type d'étude demandé (méta-analyse, expérimental…), FR et EN : cherché avec ET, exigé pour un 3")
     p.add_argument("--snowball", type=int, default=10,
                    help="nombre maximal de travaux ajoutés parce que plusieurs notices pertinentes les citent (0 = aucun)")
     search_options(p)
