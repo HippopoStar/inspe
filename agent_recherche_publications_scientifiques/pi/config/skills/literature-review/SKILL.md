@@ -1,46 +1,46 @@
 ---
 name: literature-review
-description: Constitue une sélection de publications scientifiques sur un thème (HAL, TEL, DUMAS, OpenAlex, Crossref, Cairn, Persée, OpenEdition, JSTOR, Taylor & Francis, ERIC, DOAJ, CORE, Semantic Scholar, et Springer, Scopus, Web of Science si une clé est fournie), classée par pertinence et nombre de citations, avec PDF et export Zotero (selection.ris).
+description: Builds a selection of scientific publications on a topic (HAL, TEL, DUMAS, OpenAlex, Crossref, Cairn, Persée, OpenEdition, JSTOR, Taylor & Francis, ERIC, DOAJ, CORE, Semantic Scholar, plus Springer, Scopus and Web of Science when a key is provided), ranked by relevance and citation count, with PDFs and a Zotero export (selection.ris).
 ---
 
-# Sélection de publications sur un thème
+# Publication selection on a topic
 
-**Règle stricte** : une seule commande fait tout (recherche, notation, PDF, export). Ne lis pas `metadata.json`, n'écris aucun script.
+**Strict rule**: one single command does everything (search, grading, PDFs, export). Do not read `metadata.json`, do not write any script.
 
-**Langue** : le français et l'anglais conviennent toujours tous les deux. Donne toujours des requêtes dans les deux langues (la commande l'exige) et ne cherche jamais à filtrer ou à préférer une langue.
+**Language**: French and English publications are always both fine. Always give queries in both languages (the command requires it) and never filter or prefer a language. Answer the user in the language they wrote in.
 
-## 1. Prépare la commande (sans longue réflexion)
+## 1. Prepare the command (no long thinking)
 
-- `<dossier>` : nom court du thème en minuscules, ex. `didactique_informatique`.
-- `--topic` : le sujet de l'utilisateur en une phrase.
-- `--fr` : 2 ou 3 requêtes courtes de mots-clés en français (pas la phrase de l'utilisateur).
-- `--en` : les mêmes idées en anglais, 2 ou 3 requêtes.
-  Exemple pour « méthodes pour enseigner l'informatique » :
+- `<folder>`: short lowercase name for the topic, e.g. `didactique_informatique`.
+- `--topic`: the user's subject in one sentence.
+- `--fr`: 2 or 3 short keyword queries in French (not the user's sentence).
+- `--en`: the same ideas in English, 2 or 3 queries.
+  Example for "méthodes pour enseigner l'informatique":
   `--fr "didactique de l'informatique" "enseignement de la programmation" "pensée informatique école"`
   `--en "computing education pedagogy" "teaching programming novices"`
-- `--sources` selon le domaine (les bases sans clé fournie sont ignorées automatiquement) :
-  * SHS / francophone : `hal tel dumas cairn persee openedition openalex`
-  * Sciences de l'éducation : `hal tel dumas eric cairn openalex`
-  * Informatique / sciences dures : `openalex semanticscholar core springer scopus wos`
-  * Généraliste ou doute : `all` (toutes les bases accessibles, plus long)
+- `--sources` by field (databases whose key is missing are skipped automatically):
+  * Humanities / social sciences, French-speaking: `hal tel dumas cairn persee openedition openalex`
+  * Education: `hal tel dumas eric cairn openalex`
+  * Computer science / hard sciences: `openalex semanticscholar core springer scopus wos`
+  * General or unsure: `all` (every accessible database, slower)
 
-## 2. Lance-la
+## 2. Run it
 
 ```bash
 python3 /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py review \
-  --dir "/workspace/<dossier>" \
-  --topic "<sujet en une phrase>" \
+  --dir "/workspace/<folder>" \
+  --topic "<subject in one sentence>" \
   --fr "<requête 1>" "<requête 2>" \
   --en "<query 1>" "<query 2>" \
   --sources <sources>
 ```
 
-## 3. Réponds
+## 3. Answer
 
-Recopie tel quel le tableau affiché à la fin (toutes les lignes), puis indique :
-- `/workspace/<dossier>/selection.ris` à importer dans Zotero (Fichier > Importer) ;
-- `/workspace/<dossier>/pdfs/` à charger dans une collection Knowledge d'Open WebUI ;
-- les PDF marqués `[lien]` sont à télécharger à la main (HAL bloque les robots).
+Copy the table printed at the end exactly as is (every row), then tell the user, in their language:
+- `/workspace/<folder>/selection.ris` is to be imported into Zotero (File > Import);
+- `/workspace/<folder>/pdfs/` is to be uploaded to an Open WebUI Knowledge collection;
+- PDFs marked `[lien]` must be downloaded by hand (HAL blocks robots).
 
-Si l'utilisateur veut plus ou moins de résultats, relance avec `--max-results` (défaut 10) ou `--min-relevance` (défaut 2).
-Pour savoir quelles bases sont accessibles : `search_manager.py sources --check`.
+If the user wants more or fewer results, run again with `--max-results` (default 10) or `--min-relevance` (default 2).
+To see which databases are accessible: `search_manager.py sources --check`.

@@ -30,6 +30,7 @@
 - `review` exige `--fr` et `--en` et n'a pas de filtre de langue.
 - La consigne de notation ignore la langue.
 - L'agent n'a donc rien à arbitrer.
+- `AGENTS.md` et `SKILL.md` sont rédigés en anglais, car Qwen3 suit mieux des consignes en anglais. Le modèle répond dans la langue de l'utilisateur.
 
 **Classement**
 - Ordre : pertinence 0-3, puis percentile de citations OpenAlex (corrigé de l'âge et du domaine), puis citations brutes.
