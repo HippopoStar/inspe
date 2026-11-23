@@ -11,11 +11,12 @@ description: Builds a selection of scientific publications on a topic (HAL, TEL,
 
 ## 1. Prepare the command (no long thinking)
 
-- `<folder>`: short lowercase name for the topic, e.g. `didactique_informatique`.
+- `<folder>`: 2 or 3 words from the user's topic, lowercase, joined by `_` (the command adds the date and time in front). Never reuse a name from an example.
 - `--topic`: the user's subject in one sentence.
-- `--fr`: 2 or 3 short keyword queries in French (not the user's sentence).
+- `--fr`: 2 or 3 keyword queries in French (not the user's sentence).
 - `--en`: the same ideas in English, 2 or 3 queries.
 - **Every query must contain the topic's core concept.** A query made only of generic words ("études comparatives", "pedagogical process") brings back off-topic results.
+- **2 to 4 words per query.** HAL, TEL and DUMAS require every word: a long query returns nothing. Put context (level, method) in `--topic`, not in the queries.
   Example for "études comparatives sur le peer learning":
   `--fr "apprentissage entre pairs" "apprentissage par les pairs comparaison" "tutorat entre pairs efficacité"`
   `--en "peer learning comparative study" "peer tutoring effectiveness" "peer instruction versus lecture"`
@@ -38,9 +39,11 @@ python3 /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py 
 
 ## 3. Answer
 
-Copy the table printed at the end exactly as is (every row), then tell the user, in their language:
-- `/workspace/<folder>/selection.ris` is to be imported into Zotero (File > Import);
-- `/workspace/<folder>/pdfs/` is to be uploaded to an Open WebUI Knowledge collection;
+Do not copy the table: the user already sees the command output, and the table is saved in `SELECTION.md`.
+Answer in a few lines, in the user's language, with the folder path printed by the command (it starts with the date):
+- how many publications were kept, and that the table is in `<printed folder>/SELECTION.md`;
+- `<printed folder>/selection.ris` is to be imported into Zotero (File > Import);
+- `<printed folder>/pdfs/` is to be uploaded to an Open WebUI Knowledge collection;
 - PDFs marked `[lien]` must be downloaded by hand (HAL blocks robots).
 
 The selection keeps the 20 best results. If the user wants more or fewer, run again with `--top` (default 20) or `--min-relevance` (default 2).

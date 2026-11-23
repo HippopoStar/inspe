@@ -46,7 +46,7 @@ def cmd_review(a):
     keep = rank.selected(records, a.min_relevance, a.top)
     pdf.download(keep, a.dir)
     print(f"\n{len(keep)}/{len(records)} publication(s) retenue(s) (pertinence ≥ {a.min_relevance}, {a.top} au plus). "
-          f"Zotero : importer {os.path.join(a.dir, 'selection.ris')}\n")
+          f"Dossier : {a.dir}\n")
     print(export.write(keep, a.dir))
 
 
