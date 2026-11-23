@@ -68,6 +68,7 @@ services:
       - ./workspace:/workspace
       - ./pi/config/skills:/home/node/.pi/agent/skills:ro   # lecture seule : le LLM ne peut pas modifier ses scripts
       - ./pi/config/sessions:/home/node/.pi/agent/sessions
+      - /etc/localtime:/etc/localtime:ro   # heure locale de l'hôte : dossiers de recherche datés
     configs:
       - { source: pi_agents, target: /home/node/.pi/agent/AGENTS.md }
       - { source: pi_models, target: /home/node/.pi/agent/models.json }

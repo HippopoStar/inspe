@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -29,7 +30,14 @@ def save(theme_dir: str, records: list):
         json.dump(records, f, indent=2, ensure_ascii=False)
 
 
+def dated(path: str) -> str:
+    """/workspace/x -> /workspace/2026-11-23_20-14_x : une recherche n'écrase jamais la précédente."""
+    head, name = os.path.split(os.path.normpath(path))
+    return os.path.join(head, f"{datetime.now():%Y-%m-%d_%H-%M}_{name}")
+
+
 def cmd_review(a):
+    a.dir = dated(a.dir)
     # Requêtes FR et EN obligatoires, sans filtre de langue : les deux langues conviennent toujours.
     queries = a.fr + a.en
     records = rank.rank(search.search(queries, a.sources, a.max_results), a.topic or " / ".join(queries),

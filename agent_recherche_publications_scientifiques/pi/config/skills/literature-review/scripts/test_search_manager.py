@@ -108,6 +108,12 @@ def test_review_requires_both_languages():
             pass
 
 
+def test_review_folder_is_dated():
+    import re
+    out = search_manager.dated("/workspace/peer_learning/")
+    assert re.fullmatch(r"/workspace/\d{4}-\d\d-\d\d_\d\d-\d\d_peer_learning", out.replace(os.sep, "/")), out
+
+
 def test_sources_quoted_or_not():
     parser = search_manager.build_parser()
     base = ["review", "--dir", "x", "--fr", "a", "--en", "b", "--sources"]

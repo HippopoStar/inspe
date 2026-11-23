@@ -37,7 +37,7 @@ Pi lance une seule commande (`search_manager.py review`, voir [SKILL.md](pi/conf
 3. complète citations et PDF légaux via OpenAlex ;
 4. note chaque résumé de 0 à 3 avec le LLM ;
 5. retient les 20 mieux classées de pertinence ≥ 2 (`--top`, `--min-relevance`) ;
-6. télécharge leurs PDF et écrit dans `workspace/<thème>/` :
+6. télécharge leurs PDF et écrit dans `workspace/AAAA-MM-JJ_HH-MM_<thème>/` (une recherche n'écrase jamais la précédente) :
 
 | Fichier | Contenu |
 |---|---|
