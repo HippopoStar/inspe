@@ -10,8 +10,8 @@
       },
       "models": [
         {
-          "id": "qwen3:4b",
-          "name": "Qwen 3 4B (défaut, réflexion désactivée)",
+          "id": "qwen3:4b-instruct",
+          "name": "Qwen 3 4B Instruct (défaut, sans réflexion)",
           "reasoning": false,
           "input": ["text"],
           "contextWindow": 8192,

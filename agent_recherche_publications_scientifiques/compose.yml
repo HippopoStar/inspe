@@ -83,7 +83,7 @@ services:
       - wos_api_key
     environment:
       - OLLAMA_HOST=http://ollama:11434        # notation de pertinence (API native Ollama)
-      - RANK_MODEL=${RANK_MODEL:-qwen3:4b}
+      - RANK_MODEL=${RANK_MODEL:-qwen3:4b-instruct}
     security_opt: ["no-new-privileges:true"]
     depends_on:
       ollama: { condition: service_healthy }

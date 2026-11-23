@@ -21,7 +21,7 @@ Tout tourne en local (Ollama), réglé pour un GPU de 4 Go (RTX 3050).
 3. **Services et modèles** :
    ```
    docker compose up -d
-   docker exec ollama ollama pull qwen3:4b      # modèle par défaut ; autres choix dans pi/config/models.json
+   docker exec ollama ollama pull qwen3:4b-instruct   # modèle par défaut (sans réflexion) ; autres choix dans pi/config/models.json
    docker compose build pi
    ```
 

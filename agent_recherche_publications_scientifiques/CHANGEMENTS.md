@@ -16,7 +16,7 @@
 ## Choix et raisons
 
 **Rapidité**
-- Réflexion désactivée : `"reasoning": false` et `/no_think` dans `AGENTS.md`.
+- Modèle par défaut `qwen3:4b-instruct` (Qwen3-4B-Instruct-2507), qui ne réfléchit jamais. Avec `qwen3:4b`, `/no_think`, noyé dans le long prompt système de Pi, était ignoré : 10 min de réflexion lors du premier essai.
 - Contexte 8k avec cache KV `q8_0`, pour que le modèle tienne entièrement en VRAM.
 - Le modèle de code qwen2.5-coder est retiré.
 

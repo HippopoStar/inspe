@@ -6,7 +6,7 @@ import re
 import requests
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://ollama:11434").rstrip("/")
-RANK_MODEL = os.environ.get("RANK_MODEL", "qwen3:4b")
+RANK_MODEL = os.environ.get("RANK_MODEL", "qwen3:4b-instruct")
 LABELS = {0: "hors sujet", 1: "lien indirect", 2: "pertinent", 3: "au cœur du sujet"}
 
 PROMPT = """Sujet de recherche : {topic}
