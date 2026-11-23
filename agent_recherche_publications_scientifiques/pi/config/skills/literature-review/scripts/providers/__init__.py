@@ -1,59 +1,58 @@
+"""Registre des bases : fonction de recherche, clé API (nom du docker secret) et clé obligatoire ou non.
+Ajouter une base = écrire son module `search(query, max_results, lang)` et l'inscrire ici."""
 from functools import partial
 
-from utils import secret
+from net import secret
 from . import hal, openalex, semanticscholar, crossref, eric, doaj, core, springer, scopus, wos
 
 
-def _src(label, fn, key=None, required=False, note=""):
+def _base(label, fn, key=None, required=False, note=""):
     return {"label": label, "fn": fn, "key": key, "required": required, "note": note}
 
 
-# Chaque base : fonction de recherche, nom du secret (fichier dans ./secrets/), clé obligatoire ou non.
+def _publisher(label, doi_prefix, name):
+    return _base(f"{label} (via Crossref)", partial(crossref.search, prefix=doi_prefix, source=name),
+                 note="métadonnées seulement, texte souvent payant")
+
+
 SOURCES = {
-    "openalex": _src("OpenAlex", openalex.search, "openalex_api_key", note="sans clé : quota très réduit"),
-    "hal": _src("HAL", hal.search),
-    "tel": _src("TEL (thèses, HAL)", partial(hal.search, portal="tel", source="tel")),
-    "dumas": _src("DUMAS (mémoires, HAL)", partial(hal.search, portal="dumas", source="dumas")),
-    "crossref": _src("Crossref", crossref.search),
-    "cairn": _src("Cairn (via Crossref)", partial(crossref.search, prefix="10.3917", source="cairn"),
-                  note="métadonnées seulement, textes souvent payants"),
-    "persee": _src("Persée (via Crossref)", partial(crossref.search, prefix="10.3406", source="persee")),
-    "openedition": _src("OpenEdition (via Crossref)", partial(crossref.search, prefix="10.4000", source="openedition")),
-    "jstor": _src("JSTOR (via Crossref)", partial(crossref.search, prefix="10.2307", source="jstor"),
-                  note="métadonnées seulement"),
-    "taylorfrancis": _src("Taylor & Francis (via Crossref)",
-                          partial(crossref.search, prefix="10.1080", source="taylorfrancis"),
-                          note="métadonnées seulement"),
-    "eric": _src("ERIC", eric.search),
-    "doaj": _src("DOAJ", doaj.search),
-    "semanticscholar": _src("Semantic Scholar", semanticscholar.search, "s2_api_key",
-                            note="sans clé : erreurs 429 fréquentes"),
-    "core": _src("CORE", core.search, "core_api_key", note="sans clé : quota bas, service parfois saturé"),
-    "springer": _src("Springer Nature", springer.search, "springer_api_key", required=True),
-    "scopus": _src("Scopus", scopus.search, "scopus_api_key", required=True,
-                   note="complet seulement depuis un établissement abonné ou avec scopus_insttoken"),
-    "wos": _src("Web of Science (Starter)", wos.search, "wos_api_key", required=True, note="pas de résumés"),
+    "openalex": _base("OpenAlex", openalex.search, "openalex_api_key", note="sans clé : quota très réduit"),
+    "hal": _base("HAL", hal.search),
+    "tel": _base("TEL (thèses)", partial(hal.search, portal="tel", source="tel")),
+    "dumas": _base("DUMAS (mémoires)", partial(hal.search, portal="dumas", source="dumas")),
+    "crossref": _base("Crossref", crossref.search),
+    "cairn": _publisher("Cairn", "10.3917", "cairn"),
+    "persee": _publisher("Persée", "10.3406", "persee"),
+    "openedition": _publisher("OpenEdition", "10.4000", "openedition"),
+    "jstor": _publisher("JSTOR", "10.2307", "jstor"),
+    "taylorfrancis": _publisher("Taylor & Francis", "10.1080", "taylorfrancis"),
+    "eric": _base("ERIC", eric.search),
+    "doaj": _base("DOAJ", doaj.search),
+    "semanticscholar": _base("Semantic Scholar", semanticscholar.search, "s2_api_key",
+                             note="sans clé : erreurs 429 fréquentes"),
+    "core": _base("CORE", core.search, "core_api_key", note="sans clé : quota bas"),
+    "springer": _base("Springer Nature", springer.search, "springer_api_key", required=True),
+    "scopus": _base("Scopus", scopus.search, "scopus_api_key", required=True,
+                    note="complet depuis un établissement abonné ou avec scopus_insttoken"),
+    "wos": _base("Web of Science", wos.search, "wos_api_key", required=True, note="sans résumés"),
 }
 
-# Demandées mais non intégrées, avec la raison (affichées par `sources`).
-EXCLUDED = {
+NOT_INTEGRATED = {
     "Google Scholar": "aucune API ; le site bloque les robots (CAPTCHA) et l'interdit dans ses conditions",
-    "Pascal et Francis": "base INIST figée (1972-2015), sans API de recherche publique",
-    "EBSCO": "API EDS réservée aux établissements abonnés (compte activé par EBSCO) ; à ajouter si l'université fournit un accès",
-    "Sci-Hub": "diffuse des articles en violation du droit d'auteur, bloqué en France par décision de justice : exclu",
+    "Pascal et Francis": "archive INIST figée (1972-2015), sans API de recherche",
+    "EBSCO": "API réservée aux établissements abonnés (compte activé par EBSCO)",
+    "Sci-Hub, Open-Slum": "diffusion d'articles en violation du droit d'auteur (Open-Slum ne fait que surveiller "
+                          "ces sites) ; à la place, les PDF légaux en accès libre sont cherchés via OpenAlex/Unpaywall",
 }
 
 
 def status(name: str) -> str:
-    """'ok' (clé fournie ou inutile), 'limité' (clé optionnelle absente), 'clé manquante' (inutilisable)."""
-    s = SOURCES[name]
-    if not s["key"] or secret(s["key"]):
+    """« ok », « limité » (clé facultative absente) ou « clé manquante » (base inutilisable)."""
+    base = SOURCES[name]
+    if not base["key"] or secret(base["key"]):
         return "ok"
-    return "clé manquante" if s["required"] else "limité"
+    return "clé manquante" if base["required"] else "limité"
 
 
 def available() -> list:
-    return [n for n in SOURCES if status(n) != "clé manquante"]
-
-
-PROVIDERS = {name: s["fn"] for name, s in SOURCES.items()}
+    return [name for name in SOURCES if status(name) != "clé manquante"]
