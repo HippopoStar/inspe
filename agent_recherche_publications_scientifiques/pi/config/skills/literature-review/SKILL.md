@@ -1,40 +1,39 @@
 ---
 name: literature-review
-description: Recherche des articles scientifiques en français et anglais sur HAL, OpenAlex (Persée, OpenEdition, Cairn), Semantic Scholar, Crossref, ERIC et DOAJ via l'orchestrateur modulaire search_manager.py, télécharge les PDF et rédige une synthèse.
+description: Constitue une sélection de publications scientifiques sur un thème (HAL, OpenAlex, Semantic Scholar, Crossref, ERIC, DOAJ), classée par pertinence et nombre de citations, avec PDF et export Zotero (selection.ris).
 ---
 
-# Procédure de revue de littérature multi-bases
+# Sélection de publications sur un thème
 
-**Règle stricte** : Utilise exclusivement l'orchestrateur persistant `/home/node/.pi/agent/skills/literature-review/scripts/search_manager.py`. N'écris pas de nouveau script de scraping.
+**Règle stricte** : une seule commande fait tout (recherche, notation, PDF, export). Ne lis pas `metadata.json`, n'écris aucun script.
 
-## Choix des sources selon la demande
-* **Recherche francophone / SHS (inclut HAL, Persée, OpenEdition, Cairn)** : `--sources hal openalex --lang fr`
-* **Recherche internationale généraliste** : `--sources openalex crossref doaj`
-* **Informatique / IA / Sciences dures** : `--sources semanticscholar openalex`
-* **Sciences de l'éducation** : `--sources eric openalex`
+## 1. Prépare la commande (sans longue réflexion)
 
-## Étapes d'exécution
+- `<dossier>` : nom court du thème en minuscules, ex. `didactique_informatique`.
+- `--topic` : le sujet de l'utilisateur en une phrase.
+- `--query` : 3 à 5 requêtes courtes de mots-clés (pas la phrase de l'utilisateur), en français ET en anglais, avec les termes du domaine. Exemple pour « méthodes pour enseigner l'informatique » :
+  `"didactique de l'informatique" "enseignement de la programmation" "pensée informatique école" "computing education pedagogy" "teaching programming novices"`
+- `--sources` selon le domaine :
+  * SHS / francophone : `hal openalex`
+  * Sciences de l'éducation : `hal eric openalex`
+  * Informatique / sciences dures : `semanticscholar openalex`
+  * Généraliste : `openalex crossref doaj`
+- N'ajoute `--lang fr` que si l'utilisateur veut uniquement des textes en français.
 
-1. **Collecte des métadonnées** :
-   ```bash
-   python3 /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py search \
-     --query "<mots-clés>" \
-     --sources <sources_choisies> \
-     --max-results 8 \
-     --out "/workspace/<dossier_theme>/metadata.json"
-   ```
+## 2. Lance-la
 
-2. **Filtrage et téléchargement des PDF** :
-   - Lis `/workspace/<dossier_theme>/metadata.json`.
-   - Sélectionne les 3 à 6 articles les plus pertinents (en privilégiant ceux ayant un `pdf_url` non vide).
-   - Télécharge-les via leurs identifiants complets (`id`, ex. `hal:hal-0123456` ou `openalex:W12345678`) :
-     ```bash
-     python3 /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py download \
-       --meta "/workspace/<dossier_theme>/metadata.json" \
-       --ids "<id1>" "<id2>" "<id3>" \
-       --dir "/workspace/<dossier_theme>/pdfs"
-     ```
+```bash
+python3 /home/node/.pi/agent/skills/literature-review/scripts/search_manager.py review \
+  --dir "/workspace/<dossier>" \
+  --topic "<sujet en une phrase>" \
+  --query "<requête 1>" "<requête 2>" "<requête 3>" \
+  --sources <sources>
+```
 
-3. **Rédaction de la synthèse (`SYNTHESE.md`)** :
-   - Crée `/workspace/<dossier_theme>/SYNTHESE.md` avec pour chaque article retenu : **Titre, Auteurs, Année, Base source, DOI**, nom du fichier PDF local (`suggested_filename`), problématique et résultats clés, suivi d'un **tableau comparatif**.
+## 3. Réponds
 
+Recopie tel quel le tableau affiché à la fin (toutes les lignes), puis indique :
+- `/workspace/<dossier>/selection.ris` à importer dans Zotero (Fichier > Importer) ;
+- `/workspace/<dossier>/pdfs/` à charger dans une collection Knowledge d'Open WebUI.
+
+Si l'utilisateur veut plus ou moins de résultats, relance avec `--max-results` (défaut 10) ou `--min-relevance` (défaut 2).
